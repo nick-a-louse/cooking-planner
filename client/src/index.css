@@ -369,6 +369,15 @@ button.rail-cell:hover {
   filter: brightness(1.1);
 }
 
+.task-bar-wait {
+  background-image: repeating-linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.22) 0 6px,
+    transparent 6px 12px
+  );
+  border: 1.5px dashed rgba(255, 255, 255, 0.55);
+}
+
 .task-bar-dragging {
   filter: brightness(1.15);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);

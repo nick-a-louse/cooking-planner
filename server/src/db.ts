@@ -46,6 +46,7 @@ db.exec(`
     id TEXT PRIMARY KEY,
     plan_id TEXT NOT NULL REFERENCES plans(id) ON DELETE CASCADE,
     group_id TEXT REFERENCES groups(id) ON DELETE SET NULL,
+    kind TEXT NOT NULL DEFAULT 'task' CHECK (kind IN ('task','wait')),
     name TEXT NOT NULL,
     start_min INTEGER NOT NULL DEFAULT 0,
     duration_min INTEGER NOT NULL DEFAULT 10 CHECK (duration_min >= 1),
@@ -65,6 +66,16 @@ db.exec(`
   );
 
   CREATE INDEX IF NOT EXISTS idx_groups_plan ON groups(plan_id);
+`);
+
+// Additive migration for databases created before the wait-task feature.
+try {
+  db.exec("ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'");
+} catch {
+  // Column already exists.
+}
+
+db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tasks_plan ON tasks(plan_id);
   CREATE INDEX IF NOT EXISTS idx_deps_plan ON deps(plan_id);
 `);

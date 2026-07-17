@@ -42,6 +42,7 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
   const [duration, setDuration] = useState(task.durationMin);
   const [color, setColor] = useState(task.color ?? DEFAULT_TASK_COLOR);
   const [notes, setNotes] = useState(task.notes);
+  const [kind, setKind] = useState(task.kind);
   const [predIds, setPredIds] = useState<string[]>(predecessorsOf(task.id, doc.deps));
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -64,6 +65,7 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
               ...task,
               name: name.trim() || task.name,
               groupId: groupId || null,
+              kind,
               startMin: hasPreds ? task.startMin : timeInputToOffset(startInput, doc, endMin),
               durationMin: snapDuration(duration),
               color: grouped ? null : color,
@@ -147,6 +149,14 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
         {grouped && (
           <p className="muted small">Colour comes from the group.</p>
         )}
+        <label className="pred-option">
+          <input
+            type="checkbox"
+            checked={kind === "wait"}
+            onChange={(e) => setKind(e.target.checked ? "wait" : "task")}
+          />
+          Wait (a pause, e.g. resting or marinating)
+        </label>
         <label>
           Notes
           <textarea

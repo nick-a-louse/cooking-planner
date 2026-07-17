@@ -23,10 +23,14 @@ export interface Group {
   sortOrder: number;
 }
 
+export type TaskKind = "task" | "wait";
+
 export interface Task {
   id: string;
   planId: string;
   groupId: string | null;
+  /** "wait" renders as a striped pause bar (e.g. "rest the meat") but schedules like any task. */
+  kind: TaskKind;
   name: string;
   /** Offset in minutes on the plan's internal timeline (0 = earliest point). */
   startMin: number;

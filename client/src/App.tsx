@@ -36,7 +36,7 @@ export default function App() {
   const editingTask = doc.tasks.find((t) => t.id === editingTaskId) ?? null;
   const editingGroup = doc.groups.find((g) => g.id === editingGroupId) ?? null;
 
-  const addTask = () => {
+  const addTask = (kind: Task["kind"] = "task") => {
     const id = crypto.randomUUID();
     updateDoc((d) => ({
       ...d,
@@ -46,7 +46,8 @@ export default function App() {
           id,
           planId: d.plan.id,
           groupId: null,
-          name: "New task",
+          kind,
+          name: kind === "wait" ? "Wait" : "New task",
           startMin: 0,
           durationMin: 15,
           color: null,
@@ -211,7 +212,8 @@ export default function App() {
       </header>
 
       <div className="toolbar">
-        <button onClick={addTask}>+ Task</button>
+        <button onClick={() => addTask()}>+ Task</button>
+        <button onClick={() => addTask("wait")}>+ Wait</button>
         <button onClick={addGroup}>+ Group</button>
         <button
           className={linking ? "btn-active" : ""}

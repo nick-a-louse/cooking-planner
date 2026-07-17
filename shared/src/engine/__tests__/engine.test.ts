@@ -9,6 +9,7 @@ function task(id: string, startMin: number, durationMin: number): Task {
     id,
     planId: "p",
     groupId: null,
+    kind: "task",
     name: id,
     startMin,
     durationMin,

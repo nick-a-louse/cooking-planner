@@ -30,6 +30,7 @@ function rowToTask(r: any): Task {
     id: r.id,
     planId: r.plan_id,
     groupId: r.group_id,
+    kind: r.kind ?? "task",
     name: r.name,
     startMin: r.start_min,
     durationMin: r.duration_min,
@@ -66,8 +67,8 @@ const insertGroup = () =>
   );
 const insertTask = () =>
   db.prepare(
-    `INSERT INTO tasks (id, plan_id, group_id, name, start_min, duration_min, color, notes, sort_order, status, actual_start_at, actual_done_at)
-     VALUES (@id, @planId, @groupId, @name, @startMin, @durationMin, @color, @notes, @sortOrder, @status, @actualStartAt, @actualDoneAt)`,
+    `INSERT INTO tasks (id, plan_id, group_id, kind, name, start_min, duration_min, color, notes, sort_order, status, actual_start_at, actual_done_at)
+     VALUES (@id, @planId, @groupId, @kind, @name, @startMin, @durationMin, @color, @notes, @sortOrder, @status, @actualStartAt, @actualDoneAt)`,
   );
 const insertDep = () =>
   db.prepare(

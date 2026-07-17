@@ -74,7 +74,7 @@ export default function TaskBar({
 
   return (
     <div
-      className={`task-bar${dragging ? " task-bar-dragging" : ""}${linkSelected ? " task-bar-link-selected" : ""}`}
+      className={`task-bar${task.kind === "wait" ? " task-bar-wait" : ""}${dragging ? " task-bar-dragging" : ""}${linkSelected ? " task-bar-link-selected" : ""}`}
       role="button"
       tabIndex={0}
       style={{ left, width, background: taskColor(task, groups) }}
