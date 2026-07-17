@@ -9,7 +9,7 @@ import PlanSettings from "./components/PlanSettings";
 import { usePlanStore } from "./state/planStore";
 
 export default function App() {
-  const { doc, closePlan, saveState, updateDoc } = usePlanStore();
+  const { doc, closePlan, saveState, updateDoc, saveAsTemplate } = usePlanStore();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
@@ -263,7 +263,16 @@ export default function App() {
       )}
 
       {settingsOpen && (
-        <PlanSettings plan={doc.plan} onSave={savePlanSettings} onClose={() => setSettingsOpen(false)} />
+        <PlanSettings
+          plan={doc.plan}
+          onSave={savePlanSettings}
+          onSaveAsTemplate={() => {
+            void saveAsTemplate(`${doc.plan.name} template`);
+            setSettingsOpen(false);
+            showToast(`Saved "${doc.plan.name}" as a template`);
+          }}
+          onClose={() => setSettingsOpen(false)}
+        />
       )}
 
       {toast && <div className="toast">{toast}</div>}

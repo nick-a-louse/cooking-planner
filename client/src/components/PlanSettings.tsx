@@ -5,10 +5,11 @@ import Modal from "./Modal";
 interface Props {
   plan: Plan;
   onSave: (updated: Plan) => void;
+  onSaveAsTemplate: () => void;
   onClose: () => void;
 }
 
-export default function PlanSettings({ plan, onSave, onClose }: Props) {
+export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onClose }: Props) {
   const [name, setName] = useState(plan.name);
   const [mode, setMode] = useState<PlanMode>(plan.mode);
   const [anchorTime, setAnchorTime] = useState(plan.anchorTime);
@@ -62,6 +63,9 @@ export default function PlanSettings({ plan, onSave, onClose }: Props) {
           </p>
         )}
         <div className="editor-actions">
+          <button type="button" onClick={onSaveAsTemplate}>
+            Save as template
+          </button>
           <span className="spacer" />
           <button type="button" onClick={onClose}>
             Cancel

@@ -24,6 +24,10 @@ interface PlanState {
   closePlan: () => void;
   /** Apply a local mutation to the open doc and schedule a debounced save. */
   updateDoc: (mutate: (doc: PlanDoc) => PlanDoc) => void;
+  /** Snapshot the currently open plan as a reusable template. */
+  saveAsTemplate: (name: string) => Promise<void>;
+  /** Clone a template into a fresh plan with a new name/anchor and open it. */
+  useTemplate: (templateId: string, name: string, anchorTime: string) => Promise<void>;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -81,6 +85,27 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     }
     set({ doc: null });
     void get().loadPlans();
+  },
+
+  saveAsTemplate: async (name) => {
+    const doc = get().doc;
+    if (!doc) return;
+    try {
+      await api.clonePlan(doc.plan.id, { name, asTemplate: true });
+      await get().loadPlans();
+    } catch (e) {
+      set({ error: (e as Error).message });
+    }
+  },
+
+  useTemplate: async (templateId, name, anchorTime) => {
+    try {
+      const cloned = await api.clonePlan(templateId, { name, anchorTime });
+      set({ doc: normalize(cloned), saveState: "saved" });
+      await get().loadPlans();
+    } catch (e) {
+      set({ error: (e as Error).message });
+    }
   },
 
   updateDoc: (mutate) => {

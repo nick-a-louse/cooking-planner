@@ -419,8 +419,19 @@ button.rail-cell:hover {
 
 .drag-grip {
   color: var(--muted);
-  font-size: 0.7rem;
+  font-size: 0.95rem;
   flex-shrink: 0;
+  padding-right: 2px;
+}
+
+button.rail-cell:hover .drag-grip {
+  color: var(--accent);
+}
+
+.section-title {
+  font-size: 1rem;
+  margin: 1.6rem 0 0.6rem;
+  color: var(--muted);
 }
 
 /* Dependencies */
