@@ -1,6 +1,13 @@
 import { create } from "zustand";
 import type { PlanDoc, PlanSummary } from "@cookplan/shared";
+import { reflow, sanitizeDeps } from "@cookplan/shared";
 import { api } from "../api/client";
+
+/** Enforce engine invariants: valid acyclic deps, dependent starts derived. */
+function normalize(doc: PlanDoc): PlanDoc {
+  const deps = sanitizeDeps(doc.deps, new Set(doc.tasks.map((t) => t.id)));
+  return { ...doc, deps, tasks: reflow(doc.tasks, deps) };
+}
 
 interface PlanState {
   plans: PlanSummary[];
@@ -61,7 +68,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   openPlan: async (id) => {
     set({ docLoading: true, error: null });
     try {
-      set({ doc: await api.getPlan(id), docLoading: false, saveState: "saved" });
+      set({ doc: normalize(await api.getPlan(id)), docLoading: false, saveState: "saved" });
     } catch (e) {
       set({ error: (e as Error).message, docLoading: false });
     }
@@ -79,7 +86,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   updateDoc: (mutate) => {
     const doc = get().doc;
     if (!doc) return;
-    const next = mutate(doc);
+    const next = normalize(mutate(doc));
     set({ doc: next, saveState: "saving" });
     if (saveTimer) clearTimeout(saveTimer);
     saveTimer = setTimeout(async () => {

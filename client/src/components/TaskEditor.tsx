@@ -1,13 +1,22 @@
 import { useState } from "react";
 import type { PlanDoc, Task } from "@cookplan/shared";
-import { DEFAULT_TASK_COLOR, formatHM, planEndMin, snapDuration, snapMin, wallClock } from "@cookplan/shared";
+import {
+  DEFAULT_TASK_COLOR,
+  formatHM,
+  planEndMin,
+  predecessorsOf,
+  snapDuration,
+  snapMin,
+  wallClock,
+  wouldCreateCycle,
+} from "@cookplan/shared";
 import Modal from "./Modal";
 import SwatchPicker from "./SwatchPicker";
 
 interface Props {
   doc: PlanDoc;
   task: Task;
-  onSave: (updated: Task) => void;
+  onSave: (updated: Task, predecessorIds: string[]) => void;
   onDelete: (taskId: string) => void;
   onClose: () => void;
 }
@@ -33,9 +42,16 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
   const [duration, setDuration] = useState(task.durationMin);
   const [color, setColor] = useState(task.color ?? DEFAULT_TASK_COLOR);
   const [notes, setNotes] = useState(task.notes);
+  const [predIds, setPredIds] = useState<string[]>(predecessorsOf(task.id, doc.deps));
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const grouped = groupId !== "";
+  const hasPreds = predIds.length > 0;
+
+  // Deps excluding this task's own incoming links — the base for cycle checks
+  // when toggling predecessors on/off in the editor.
+  const otherDeps = doc.deps.filter((d) => d.successorId !== task.id);
+  const candidates = doc.tasks.filter((t) => t.id !== task.id);
 
   return (
     <Modal title="Edit task" onClose={onClose}>
@@ -43,15 +59,18 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
         className="editor-form"
         onSubmit={(e) => {
           e.preventDefault();
-          onSave({
-            ...task,
-            name: name.trim() || task.name,
-            groupId: groupId || null,
-            startMin: timeInputToOffset(startInput, doc, endMin),
-            durationMin: snapDuration(duration),
-            color: grouped ? null : color,
-            notes,
-          });
+          onSave(
+            {
+              ...task,
+              name: name.trim() || task.name,
+              groupId: groupId || null,
+              startMin: hasPreds ? task.startMin : timeInputToOffset(startInput, doc, endMin),
+              durationMin: snapDuration(duration),
+              color: grouped ? null : color,
+              notes,
+            },
+            predIds,
+          );
         }}
       >
         <label>
@@ -72,7 +91,13 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
         <div className="field-row">
           <label>
             Start
-            <input type="time" value={startInput} onChange={(e) => setStartInput(e.target.value)} />
+            <input
+              type="time"
+              value={startInput}
+              onChange={(e) => setStartInput(e.target.value)}
+              disabled={hasPreds}
+              title={hasPreds ? "Start follows the linked task" : undefined}
+            />
           </label>
           <label>
             Duration (min)
@@ -85,6 +110,34 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
             />
           </label>
         </div>
+        {hasPreds && <p className="muted small">Start is set automatically — this task begins when its linked task finishes.</p>}
+        {candidates.length > 0 && (
+          <fieldset className="preds-field">
+            <legend className="swatch-label">Starts after</legend>
+            <div className="preds-list">
+              {candidates.map((t) => {
+                const checked = predIds.includes(t.id);
+                const cyclic = !checked && wouldCreateCycle(otherDeps, t.id, task.id);
+                return (
+                  <label key={t.id} className={`pred-option${cyclic ? " muted" : ""}`}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      disabled={cyclic}
+                      onChange={(e) =>
+                        setPredIds(
+                          e.target.checked ? [...predIds, t.id] : predIds.filter((id) => id !== t.id),
+                        )
+                      }
+                    />
+                    {t.name}
+                    {cyclic && <span className="small"> (would loop)</span>}
+                  </label>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
         {!grouped && (
           <div className="swatch-field">
             <span className="swatch-label">Colour</span>

@@ -1,10 +1,10 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Group, Task } from "@cookplan/shared";
+import { nextUnusedColor, predecessorsOf, wouldCreateCycle } from "@cookplan/shared";
 import PlanList from "./components/PlanList";
 import TimelineCanvas from "./components/Timeline/TimelineCanvas";
 import TaskEditor from "./components/TaskEditor";
 import GroupEditor from "./components/GroupEditor";
-import { nextUnusedColor } from "@cookplan/shared";
 import { usePlanStore } from "./state/planStore";
 
 export default function App() {
@@ -12,8 +12,24 @@ export default function App() {
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
+  const [linking, setLinking] = useState(false);
+  const [linkPred, setLinkPred] = useState<string | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
 
   if (!doc) return <PlanList />;
+
+  const showToast = (msg: string) => {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 2600);
+  };
 
   const editingTask = doc.tasks.find((t) => t.id === editingTaskId) ?? null;
   const editingGroup = doc.groups.find((g) => g.id === editingGroupId) ?? null;
@@ -61,10 +77,22 @@ export default function App() {
     setEditingGroupId(id);
   };
 
-  const saveTask = (updated: Task) => {
+  const saveTask = (updated: Task, predecessorIds: string[]) => {
     updateDoc((d) => ({
       ...d,
       tasks: d.tasks.map((t) => (t.id === updated.id ? updated : t)),
+      deps: [
+        ...d.deps.filter((dep) => dep.successorId !== updated.id),
+        ...predecessorIds
+          .filter((pid) =>
+            !wouldCreateCycle(
+              d.deps.filter((dep) => dep.successorId !== updated.id),
+              pid,
+              updated.id,
+            ),
+          )
+          .map((pid) => ({ planId: d.plan.id, predecessorId: pid, successorId: updated.id })),
+      ],
     }));
     setEditingTaskId(null);
   };
@@ -86,6 +114,15 @@ export default function App() {
     setEditingGroupId(null);
   };
 
+  const deleteGroup = (groupId: string) => {
+    updateDoc((d) => ({
+      ...d,
+      groups: d.groups.filter((g) => g.id !== groupId),
+      tasks: d.tasks.map((t) => (t.groupId === groupId ? { ...t, groupId: null } : t)),
+    }));
+    setEditingGroupId(null);
+  };
+
   const changeTaskTime = (taskId: string, startMin: number, durationMin: number) => {
     updateDoc((d) => ({
       ...d,
@@ -97,8 +134,6 @@ export default function App() {
     updateDoc((d) => {
       const byId = new Map(d.tasks.map((t) => [t.id, t]));
       const movedIdx = orderedIds.indexOf(movedId);
-      // The moved task adopts the group of its new neighbourhood: the task
-      // above it if any, otherwise the task below.
       const neighbourId = movedIdx > 0 ? orderedIds[movedIdx - 1] : orderedIds[movedIdx + 1];
       const newGroupId = neighbourId ? (byId.get(neighbourId)?.groupId ?? null) : null;
       return {
@@ -112,13 +147,42 @@ export default function App() {
     });
   };
 
-  const deleteGroup = (groupId: string) => {
-    updateDoc((d) => ({
-      ...d,
-      groups: d.groups.filter((g) => g.id !== groupId),
-      tasks: d.tasks.map((t) => (t.groupId === groupId ? { ...t, groupId: null } : t)),
-    }));
-    setEditingGroupId(null);
+  const handleTaskClick = (task: Task) => {
+    if (!linking) {
+      setEditingTaskId(task.id);
+      return;
+    }
+    if (!linkPred) {
+      setLinkPred(task.id);
+      showToast(`"${task.name}" selected — now tap the task that follows it`);
+      return;
+    }
+    if (linkPred === task.id) {
+      setLinkPred(null);
+      return;
+    }
+    const predTask = doc.tasks.find((t) => t.id === linkPred);
+    if (doc.deps.some((d) => d.predecessorId === linkPred && d.successorId === task.id)) {
+      showToast("Those tasks are already linked");
+    } else if (wouldCreateCycle(doc.deps, linkPred, task.id)) {
+      showToast("Can't link — that would create a loop");
+    } else {
+      updateDoc((d) => ({
+        ...d,
+        deps: [...d.deps, { planId: d.plan.id, predecessorId: linkPred, successorId: task.id }],
+      }));
+      showToast(`"${task.name}" now starts after "${predTask?.name ?? "task"}"`);
+    }
+    setLinking(false);
+    setLinkPred(null);
+  };
+
+  const handleLockedDragAttempt = (task: Task) => {
+    const predNames = predecessorsOf(task.id, doc.deps)
+      .map((id) => doc.tasks.find((t) => t.id === id)?.name)
+      .filter(Boolean)
+      .join(", ");
+    showToast(`"${task.name}" starts after ${predNames || "its linked task"} — edit that task or remove the link`);
   };
 
   return (
@@ -134,6 +198,16 @@ export default function App() {
       <div className="toolbar">
         <button onClick={addTask}>+ Task</button>
         <button onClick={addGroup}>+ Group</button>
+        <button
+          className={linking ? "btn-active" : ""}
+          onClick={() => {
+            setLinking(!linking);
+            setLinkPred(null);
+            if (!linking) showToast("Link mode: tap the task that comes first");
+          }}
+        >
+          🔗 Link
+        </button>
         <span className="spacer" />
         <button onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))} disabled={zoomIdx === 0} aria-label="Zoom out">
           −
@@ -147,10 +221,12 @@ export default function App() {
         doc={doc}
         zoomIdx={zoomIdx}
         setZoomIdx={setZoomIdx}
-        onEditTask={(t) => setEditingTaskId(t.id)}
+        linkPredecessorId={linkPred}
+        onTaskClick={handleTaskClick}
         onEditGroup={(g) => setEditingGroupId(g.id)}
         onTaskTimeChange={changeTaskTime}
         onReorder={reorderTasks}
+        onLockedDragAttempt={handleLockedDragAttempt}
       />
 
       {editingTask && (
@@ -170,6 +246,8 @@ export default function App() {
           onClose={() => setEditingGroupId(null)}
         />
       )}
+
+      {toast && <div className="toast">{toast}</div>}
     </div>
   );
 }

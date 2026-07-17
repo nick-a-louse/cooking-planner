@@ -11,19 +11,26 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Group, PlanDoc, Task } from "@cookplan/shared";
-import { planEndMin } from "@cookplan/shared";
+import { derivedTaskIds, planEndMin } from "@cookplan/shared";
 import TimeAxis from "./TimeAxis";
 import TaskBar from "./TaskBar";
+import DependencyLines from "./DependencyLines";
 import { RAIL_W, ZOOM_LEVELS, useZoomPan } from "../../hooks/useZoomPan";
+
+const AXIS_H = 28;
+const GROUP_H = 32;
+const ROW_H = 40;
 
 interface Props {
   doc: PlanDoc;
   zoomIdx: number;
   setZoomIdx: (idx: number) => void;
-  onEditTask: (task: Task) => void;
+  linkPredecessorId: string | null;
+  onTaskClick: (task: Task) => void;
   onEditGroup: (group: Group) => void;
   onTaskTimeChange: (taskId: string, startMin: number, durationMin: number) => void;
   onReorder: (orderedTaskIds: string[], movedTaskId: string) => void;
+  onLockedDragAttempt: (task: Task) => void;
 }
 
 interface Section {
@@ -70,10 +77,12 @@ export default function TimelineCanvas({
   doc,
   zoomIdx,
   setZoomIdx,
-  onEditTask,
+  linkPredecessorId,
+  onTaskClick,
   onEditGroup,
   onTaskTimeChange,
   onReorder,
+  onLockedDragAttempt,
 }: Props) {
   const { plan, groups, tasks } = doc;
   const pxPerMin = ZOOM_LEVELS[zoomIdx];
@@ -81,6 +90,7 @@ export default function TimelineCanvas({
   const totalMin = Math.max(120, Math.ceil((endMin + 30) / 30) * 30);
   const scrollRef = useRef<HTMLDivElement>(null);
   useZoomPan(scrollRef, zoomIdx, setZoomIdx);
+  const lockedIds = useMemo(() => derivedTaskIds(doc.deps), [doc.deps]);
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -102,6 +112,25 @@ export default function TimelineCanvas({
   }, [groups, tasks]);
 
   const flatTaskIds = useMemo(() => sections.flatMap((s) => s.tasks.map((t) => t.id)), [sections]);
+
+  // Fixed row heights make dependency-line geometry computable without DOM reads.
+  const { taskRowY, totalH } = useMemo(() => {
+    const map = new Map<string, number>();
+    let y = AXIS_H;
+    for (const section of sections) {
+      const hasHeader = section.group !== null || sections.length > 1;
+      if (hasHeader) y += GROUP_H;
+      if (section.tasks.length === 0) {
+        y += ROW_H;
+        continue;
+      }
+      for (const t of section.tasks) {
+        map.set(t.id, y);
+        y += ROW_H;
+      }
+    }
+    return { taskRowY: map, totalH: y };
+  }, [sections]);
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -151,7 +180,7 @@ export default function TimelineCanvas({
                   )
                 )}
                 {section.tasks.map((task) => (
-                  <SortableTaskRow key={task.id} task={task} onEdit={() => onEditTask(task)}>
+                  <SortableTaskRow key={task.id} task={task} onEdit={() => onTaskClick(task)}>
                     <div className="track">
                       <TaskBar
                         task={task}
@@ -160,8 +189,11 @@ export default function TimelineCanvas({
                         mode={plan.mode}
                         anchorTime={plan.anchorTime}
                         endMin={endMin}
-                        onClick={() => onEditTask(task)}
+                        locked={lockedIds.has(task.id)}
+                        linkSelected={linkPredecessorId === task.id}
+                        onClick={() => onTaskClick(task)}
                         onCommit={(s, d) => onTaskTimeChange(task.id, s, d)}
+                        onLockedDragAttempt={() => onLockedDragAttempt(task)}
                       />
                     </div>
                   </SortableTaskRow>
@@ -176,6 +208,16 @@ export default function TimelineCanvas({
             ))}
           </SortableContext>
         </DndContext>
+
+        <DependencyLines
+          tasks={tasks}
+          deps={doc.deps}
+          taskRowY={taskRowY}
+          pxPerMin={pxPerMin}
+          railW={RAIL_W}
+          width={RAIL_W + totalMin * pxPerMin}
+          height={totalH}
+        />
       </div>
     </div>
   );
