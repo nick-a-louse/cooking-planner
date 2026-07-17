@@ -7,6 +7,14 @@ function now(): string {
   return new Date().toISOString();
 }
 
+/** Plan names are unique (case-insensitive, trimmed) across plans and templates. */
+function nameTaken(name: string, excludeId?: string): boolean {
+  const row = excludeId
+    ? db.prepare("SELECT id FROM plans WHERE lower(trim(name)) = lower(trim(?)) AND id != ?").get(name, excludeId)
+    : db.prepare("SELECT id FROM plans WHERE lower(trim(name)) = lower(trim(?))").get(name);
+  return row !== undefined;
+}
+
 function rowToPlan(r: any): Plan {
   return {
     id: r.id,
@@ -94,6 +102,10 @@ export function planRoutes(app: FastifyInstance): void {
 
   app.post<{ Body: { name?: string; mode?: string; anchorTime?: string } }>("/api/plans", (req, reply) => {
     const { name, mode, anchorTime } = req.body ?? {};
+    const finalName = name?.trim() || "Untitled plan";
+    if (nameTaken(finalName)) {
+      return reply.code(409).send({ error: `A plan called "${finalName}" already exists` });
+    }
     const id = nanoid(10);
     const ts = now();
     // Default anchor: today at 18:00 local — a sensible dinner-time starting point.
@@ -101,7 +113,7 @@ export function planRoutes(app: FastifyInstance): void {
     db.prepare(
       `INSERT INTO plans (id, name, mode, anchor_time, is_template, status, created_at, updated_at)
        VALUES (?, ?, ?, ?, 0, 'draft', ?, ?)`,
-    ).run(id, name?.trim() || "Untitled plan", mode === "backward" ? "backward" : "forward", anchorTime ?? defaultAnchor, ts, ts);
+    ).run(id, finalName, mode === "backward" ? "backward" : "forward", anchorTime ?? defaultAnchor, ts, ts);
     reply.code(201);
     return loadDoc(id);
   });
@@ -120,6 +132,9 @@ export function planRoutes(app: FastifyInstance): void {
     const doc = req.body;
     if (!doc?.plan || doc.plan.id !== planId) {
       return reply.code(400).send({ error: "document plan id mismatch" });
+    }
+    if (nameTaken(doc.plan.name, planId)) {
+      return reply.code(409).send({ error: `A plan called "${doc.plan.name}" already exists` });
     }
 
     transaction(() => {
@@ -163,6 +178,10 @@ export function planRoutes(app: FastifyInstance): void {
       const src = loadDoc(req.params.id);
       if (!src) return reply.code(404).send({ error: "plan not found" });
       const { name, asTemplate, anchorTime } = req.body ?? {};
+      const cloneName = name?.trim() || `${src.plan.name} (copy)`;
+      if (nameTaken(cloneName)) {
+        return reply.code(409).send({ error: `A plan called "${cloneName}" already exists` });
+      }
       const ts = now();
       const newPlanId = nanoid(10);
       const groupIdMap = new Map<string, string>();
