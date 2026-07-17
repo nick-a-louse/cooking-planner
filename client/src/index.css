@@ -166,3 +166,295 @@ button {
 .save-error {
   color: var(--danger);
 }
+
+.small {
+  font-size: 0.85rem;
+}
+
+/* Toolbar */
+.toolbar {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.toolbar button {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  border-radius: 8px;
+  padding: 0.45rem 0.9rem;
+  min-height: 40px;
+}
+
+.toolbar button:hover {
+  border-color: var(--accent);
+}
+
+/* Timeline */
+.timeline-scroll {
+  overflow: auto;
+  flex: 1;
+}
+
+.plan-view {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.timeline-inner {
+  position: relative;
+}
+
+.timeline-row {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--border);
+}
+
+.rail-cell {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  flex: 0 0 160px;
+  width: 160px;
+  padding: 0.4rem 0.6rem;
+  background: var(--bg);
+  border-right: 1px solid var(--border);
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+button.rail-cell {
+  border-top: none;
+  border-bottom: none;
+  border-left: none;
+  color: var(--fg);
+  text-align: left;
+  cursor: pointer;
+}
+
+button.rail-cell:hover {
+  color: var(--accent);
+}
+
+.axis-header {
+  position: sticky;
+  top: 0;
+  z-index: 3;
+  background: var(--bg);
+  border-bottom: 1px solid var(--border);
+}
+
+.axis-header .rail-cell {
+  z-index: 4;
+}
+
+.time-axis {
+  position: relative;
+  height: 28px;
+}
+
+.axis-tick {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px solid var(--border);
+  padding-left: 3px;
+}
+
+.axis-label {
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.group-row {
+  background: var(--card);
+}
+
+.group-cell {
+  font-weight: 600;
+  background: var(--card);
+}
+
+.group-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.group-track {
+  flex: 1;
+}
+
+.task-row-line {
+  min-height: 40px;
+}
+
+.task-cell {
+  color: var(--fg);
+}
+
+.empty-hint {
+  font-style: italic;
+}
+
+.track {
+  position: relative;
+  flex: 1;
+  min-height: 40px;
+}
+
+.task-bar {
+  position: absolute;
+  top: 6px;
+  height: 28px;
+  border: none;
+  border-radius: 6px;
+  color: white;
+  font-size: 0.8rem;
+  padding: 0 6px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  text-align: left;
+  display: flex;
+  align-items: center;
+}
+
+.task-bar:hover {
+  filter: brightness(1.1);
+}
+
+.task-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Modal */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 50;
+  padding: 1rem;
+}
+
+.modal-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  overflow: auto;
+  padding: 1rem 1.2rem;
+}
+
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+
+.modal-head h3 {
+  margin: 0;
+}
+
+.modal-close {
+  border: none;
+  background: none;
+  color: var(--muted);
+  font-size: 1rem;
+  min-width: 44px;
+  min-height: 44px;
+}
+
+.editor-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.7rem;
+}
+
+.editor-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.editor-form input,
+.editor-form select,
+.editor-form textarea {
+  font: inherit;
+  color: var(--fg);
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.5rem 0.6rem;
+}
+
+.editor-form input[type="color"] {
+  padding: 0.15rem;
+  height: 40px;
+  width: 60px;
+}
+
+.field-row {
+  display: flex;
+  gap: 0.8rem;
+}
+
+.field-row label {
+  flex: 1;
+}
+
+.editor-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-top: 0.4rem;
+}
+
+.editor-actions .spacer {
+  flex: 1;
+}
+
+.editor-actions button {
+  border: 1px solid var(--border);
+  background: none;
+  color: var(--fg);
+  border-radius: 8px;
+  padding: 0.5rem 1rem;
+  min-height: 40px;
+}
+
+.btn-primary {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: white !important;
+}
+
+.btn-danger {
+  background: var(--danger) !important;
+  border-color: var(--danger) !important;
+  color: white !important;
+}
+
+.btn-danger-outline {
+  color: var(--danger) !important;
+  border-color: var(--danger) !important;
+}
