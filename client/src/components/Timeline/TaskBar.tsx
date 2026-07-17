@@ -10,7 +10,11 @@ interface Props {
   mode: PlanMode;
   anchorTime: string;
   endMin: number;
+  /** Live runs use a frozen forward mapping regardless of plan mode. */
+  forceForward: boolean;
   locked: boolean;
+  readOnly: boolean;
+  liveClass: string;
   linkSelected: boolean;
   onClick: () => void;
   onCommit: (startMin: number, durationMin: number) => void;
@@ -24,12 +28,16 @@ export default function TaskBar({
   mode,
   anchorTime,
   endMin,
+  forceForward,
   locked,
+  readOnly,
+  liveClass,
   linkSelected,
   onClick,
   onCommit,
   onLockedDragAttempt,
 }: Props) {
+  const effMode = forceForward ? "forward" : mode;
   const drag = useBarDrag({
     startMin: task.startMin,
     durationMin: task.durationMin,
@@ -44,8 +52,8 @@ export default function TaskBar({
   const width = Math.max(durationMin * pxPerMin, 8);
   const dragging = drag.live !== null;
 
-  const startWall = wallClock(startMin, mode, anchorTime, endMin);
-  const endWall = wallClock(startMin + durationMin, mode, anchorTime, endMin);
+  const startWall = wallClock(startMin, effMode, anchorTime, endMin);
+  const endWall = wallClock(startMin + durationMin, effMode, anchorTime, endMin);
 
   const lockedHandlers = {
     onPointerDown: (e: React.PointerEvent) => {
@@ -63,18 +71,20 @@ export default function TaskBar({
     },
   };
 
-  const moveHandlers = locked
-    ? lockedHandlers
-    : {
-        onPointerDown: (e: React.PointerEvent) => drag.onPointerDown(e, "move"),
-        onPointerMove: drag.onPointerMove,
-        onPointerUp: drag.onPointerUp,
-        onPointerCancel: drag.onPointerCancel,
-      };
+  const moveHandlers = readOnly
+    ? {}
+    : locked
+      ? lockedHandlers
+      : {
+          onPointerDown: (e: React.PointerEvent) => drag.onPointerDown(e, "move"),
+          onPointerMove: drag.onPointerMove,
+          onPointerUp: drag.onPointerUp,
+          onPointerCancel: drag.onPointerCancel,
+        };
 
   return (
     <div
-      className={`task-bar${task.kind === "wait" ? " task-bar-wait" : ""}${dragging ? " task-bar-dragging" : ""}${linkSelected ? " task-bar-link-selected" : ""}`}
+      className={`task-bar${task.kind === "wait" ? " task-bar-wait" : ""}${dragging ? " task-bar-dragging" : ""}${linkSelected ? " task-bar-link-selected" : ""}${liveClass ? ` ${liveClass}` : ""}${readOnly ? " task-bar-readonly" : ""}`}
       role="button"
       tabIndex={0}
       style={{ left, width, background: taskColor(task, groups) }}
@@ -88,7 +98,7 @@ export default function TaskBar({
       }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      {!locked && (
+      {!locked && !readOnly && (
         <span
           className="bar-handle handle-l"
           onPointerDown={(e) => {
@@ -101,19 +111,22 @@ export default function TaskBar({
         />
       )}
       <span className="task-bar-label">
+        {task.status === "done" && "✓ "}
         {locked && <span className="link-glyph">↳ </span>}
         {task.name}
       </span>
-      <span
-        className="bar-handle handle-r"
-        onPointerDown={(e) => {
-          e.stopPropagation();
-          drag.onPointerDown(e, "resize-r");
-        }}
-        onPointerMove={drag.onPointerMove}
-        onPointerUp={drag.onPointerUp}
-        onPointerCancel={drag.onPointerCancel}
-      />
+      {!readOnly && (
+        <span
+          className="bar-handle handle-r"
+          onPointerDown={(e) => {
+            e.stopPropagation();
+            drag.onPointerDown(e, "resize-r");
+          }}
+          onPointerMove={drag.onPointerMove}
+          onPointerUp={drag.onPointerUp}
+          onPointerCancel={drag.onPointerCancel}
+        />
+      )}
       {dragging && (
         <div className="drag-tooltip">
           {formatHM(startWall)} – {formatHM(endWall)}

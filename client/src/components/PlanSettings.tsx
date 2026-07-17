@@ -6,10 +6,12 @@ interface Props {
   plan: Plan;
   onSave: (updated: Plan) => void;
   onSaveAsTemplate: () => void;
+  /** Present when the plan has a live/finished run that can be reset to draft. */
+  onResetRun?: () => void;
   onClose: () => void;
 }
 
-export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onClose }: Props) {
+export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRun, onClose }: Props) {
   const [name, setName] = useState(plan.name);
   const [mode, setMode] = useState<PlanMode>(plan.mode);
   const [anchorTime, setAnchorTime] = useState(plan.anchorTime);
@@ -66,6 +68,11 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onClose }
           <button type="button" onClick={onSaveAsTemplate}>
             Save as template
           </button>
+          {onResetRun && (
+            <button type="button" className="btn-danger-outline" onClick={onResetRun}>
+              Reset run
+            </button>
+          )}
           <span className="spacer" />
           <button type="button" onClick={onClose}>
             Cancel

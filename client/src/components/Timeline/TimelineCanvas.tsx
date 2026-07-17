@@ -11,7 +11,7 @@ import {
 import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Group, PlanDoc, Task } from "@cookplan/shared";
-import { derivedTaskIds, planEndMin } from "@cookplan/shared";
+import { currentTaskIds, derivedTaskIds, planEndMin } from "@cookplan/shared";
 import TimeAxis from "./TimeAxis";
 import TaskBar from "./TaskBar";
 import DependencyLines from "./DependencyLines";
@@ -26,6 +26,11 @@ interface Props {
   zoomIdx: number;
   setZoomIdx: (idx: number) => void;
   linkPredecessorId: string | null;
+  /** Minutes into the live run, or null when not live. */
+  nowMin: number | null;
+  liveZeroAt: string | null;
+  /** Live/finished plans: no drag editing, taps only. */
+  readOnly: boolean;
   onTaskClick: (task: Task) => void;
   onEditGroup: (group: Group) => void;
   onTaskTimeChange: (taskId: string, startMin: number, durationMin: number) => void;
@@ -78,6 +83,9 @@ export default function TimelineCanvas({
   zoomIdx,
   setZoomIdx,
   linkPredecessorId,
+  nowMin,
+  liveZeroAt,
+  readOnly,
   onTaskClick,
   onEditGroup,
   onTaskTimeChange,
@@ -91,6 +99,7 @@ export default function TimelineCanvas({
   const scrollRef = useRef<HTMLDivElement>(null);
   useZoomPan(scrollRef, zoomIdx, setZoomIdx);
   const lockedIds = useMemo(() => derivedTaskIds(doc.deps), [doc.deps]);
+  const liveCurrent = nowMin !== null ? currentTaskIds(tasks, nowMin) : new Set<string>();
 
   const sensors = useSensors(
     useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
@@ -147,12 +156,12 @@ export default function TimelineCanvas({
         <div className="timeline-row axis-header">
           <div className="rail-cell" />
           <TimeAxis
-            key={`${plan.mode}|${plan.anchorTime}`}
+            key={`${plan.mode}|${plan.anchorTime}|${liveZeroAt ?? ""}`}
             totalMin={totalMin}
             pxPerMin={pxPerMin}
-            mode={plan.mode}
-            anchorTime={plan.anchorTime}
-            endMin={endMin}
+            mode={liveZeroAt ? "forward" : plan.mode}
+            anchorTime={liveZeroAt ?? plan.anchorTime}
+            endMin={liveZeroAt ? 0 : endMin}
           />
         </div>
 
@@ -188,9 +197,18 @@ export default function TimelineCanvas({
                         groups={groups}
                         pxPerMin={pxPerMin}
                         mode={plan.mode}
-                        anchorTime={plan.anchorTime}
-                        endMin={endMin}
+                        anchorTime={liveZeroAt ?? plan.anchorTime}
+                        endMin={liveZeroAt ? 0 : endMin}
+                        forceForward={liveZeroAt !== null}
                         locked={lockedIds.has(task.id)}
+                        readOnly={readOnly}
+                        liveClass={
+                          task.status === "done"
+                            ? "task-bar-done"
+                            : liveCurrent.has(task.id)
+                              ? "task-bar-current"
+                              : ""
+                        }
                         linkSelected={linkPredecessorId === task.id}
                         onClick={() => onTaskClick(task)}
                         onCommit={(s, d) => onTaskTimeChange(task.id, s, d)}
@@ -219,6 +237,14 @@ export default function TimelineCanvas({
           width={RAIL_W + totalMin * pxPerMin}
           height={totalH}
         />
+
+        {nowMin !== null && nowMin >= 0 && nowMin <= totalMin && (
+          <div
+            className="now-line"
+            style={{ left: RAIL_W + nowMin * pxPerMin, height: totalH }}
+            aria-hidden
+          />
+        )}
       </div>
     </div>
   );

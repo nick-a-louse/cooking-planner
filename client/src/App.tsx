@@ -1,11 +1,24 @@
 import { useEffect, useRef, useState } from "react";
 import type { Group, Plan, Task } from "@cookplan/shared";
-import { nextUnusedColor, predecessorsOf, wouldCreateCycle } from "@cookplan/shared";
+import {
+  currentTaskIds,
+  formatHM,
+  liveWallClock,
+  nextTaskIds,
+  nextUnusedColor,
+  nowOffsetMin,
+  predecessorsOf,
+  wouldCreateCycle,
+} from "@cookplan/shared";
 import PlanList from "./components/PlanList";
 import TimelineCanvas from "./components/Timeline/TimelineCanvas";
 import TaskEditor from "./components/TaskEditor";
 import GroupEditor from "./components/GroupEditor";
 import PlanSettings from "./components/PlanSettings";
+import StartDialog from "./components/Live/StartDialog";
+import LiveTaskPanel from "./components/Live/LiveTaskPanel";
+import { useNow } from "./hooks/useNow";
+import { chime } from "./utils/chime";
 import { usePlanStore } from "./state/planStore";
 
 export default function App() {
@@ -17,13 +30,37 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [linkPred, setLinkPred] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
+  const [startDialogOpen, setStartDialogOpen] = useState(false);
+  const [liveTaskId, setLiveTaskId] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const notifiedRef = useRef<Set<string>>(new Set());
+  const now = useNow();
+
+  const isLive = doc?.plan.status === "live" && !!doc.plan.liveStartedAt;
+  const liveZeroAt = doc?.plan.liveStartedAt ?? null;
+  const nowMin = isLive && liveZeroAt ? nowOffsetMin(liveZeroAt, now) : null;
 
   useEffect(() => {
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
+
+  // Live reminders: chime + toast when a pending task starts within ~2 minutes.
+  useEffect(() => {
+    if (!doc || !isLive || nowMin === null || !liveZeroAt) return;
+    for (const t of doc.tasks) {
+      if (t.status !== "pending" || notifiedRef.current.has(t.id)) continue;
+      const inMin = t.startMin - nowMin;
+      if (inMin > 0 && inMin <= 2) {
+        notifiedRef.current.add(t.id);
+        chime();
+        setToast(`Coming up: "${t.name}" at ${formatHM(liveWallClock(t.startMin, liveZeroAt))}`);
+        if (toastTimer.current) clearTimeout(toastTimer.current);
+        toastTimer.current = setTimeout(() => setToast(null), 6000);
+      }
+    }
+  }, [doc, isLive, nowMin, liveZeroAt]);
 
   if (!doc) return <PlanList />;
 
@@ -150,7 +187,57 @@ export default function App() {
     });
   };
 
+  const startRun = (liveZeroAtIso: string) => {
+    notifiedRef.current.clear();
+    updateDoc((d) => ({
+      ...d,
+      plan: { ...d.plan, status: "live", liveStartedAt: liveZeroAtIso },
+    }));
+    setStartDialogOpen(false);
+    chime();
+    showToast("Cooking started — tap a task to see notes or mark it done");
+  };
+
+  const endRun = () => {
+    updateDoc((d) => ({ ...d, plan: { ...d.plan, status: "done" } }));
+    showToast("Run finished 🎉");
+  };
+
+  const resetRun = () => {
+    notifiedRef.current.clear();
+    updateDoc((d) => ({
+      ...d,
+      plan: { ...d.plan, status: "draft", liveStartedAt: null },
+      tasks: d.tasks.map((t) => ({ ...t, status: "pending" as const, actualStartAt: null, actualDoneAt: null })),
+    }));
+    setSettingsOpen(false);
+    showToast("Run reset — plan is editable again");
+  };
+
+  const completeTask = (task: Task, actualEndMin: number, applyShift: boolean) => {
+    updateDoc((d) => ({
+      ...d,
+      tasks: d.tasks.map((t) =>
+        t.id === task.id
+          ? {
+              ...t,
+              status: "done" as const,
+              actualDoneAt: new Date().toISOString(),
+              ...(applyShift ? { durationMin: Math.max(1, actualEndMin - t.startMin) } : {}),
+            }
+          : t,
+      ),
+    }));
+    setLiveTaskId(null);
+    const remaining = doc.tasks.filter((t) => t.id !== task.id && t.status !== "done").length;
+    showToast(remaining === 0 ? `All tasks done 🎉` : `"${task.name}" done`);
+  };
+
   const handleTaskClick = (task: Task) => {
+    if (isLive || doc.plan.status === "done") {
+      setLiveTaskId(task.id);
+      return;
+    }
     if (!linking) {
       setEditingTaskId(task.id);
       return;
@@ -212,20 +299,48 @@ export default function App() {
       </header>
 
       <div className="toolbar">
-        <button onClick={() => addTask()}>+ Task</button>
-        <button onClick={() => addTask("wait")}>+ Wait</button>
-        <button onClick={addGroup}>+ Group</button>
-        <button
-          className={linking ? "btn-active" : ""}
-          onClick={() => {
-            setLinking(!linking);
-            setLinkPred(null);
-            if (!linking) showToast("Link mode: tap the task that comes first");
-          }}
-        >
-          🔗 Link
-        </button>
-        <span className="spacer" />
+        {doc.plan.status === "draft" && (
+          <>
+            <button onClick={() => addTask()}>+ Task</button>
+            <button onClick={() => addTask("wait")}>+ Wait</button>
+            <button onClick={addGroup}>+ Group</button>
+            <button
+              className={linking ? "btn-active" : ""}
+              onClick={() => {
+                setLinking(!linking);
+                setLinkPred(null);
+                if (!linking) showToast("Link mode: tap the task that comes first");
+              }}
+            >
+              🔗 Link
+            </button>
+            {doc.tasks.length > 0 && (
+              <button className="btn-start" onClick={() => setStartDialogOpen(true)}>
+                ▶ Start
+              </button>
+            )}
+          </>
+        )}
+        {isLive && nowMin !== null && liveZeroAt && (
+          <>
+            <span className="live-status">
+              {(() => {
+                const current = doc.tasks.filter((t) => currentTaskIds(doc.tasks, nowMin).has(t.id));
+                const next = doc.tasks.filter((t) => nextTaskIds(doc.tasks, nowMin).has(t.id));
+                const nowPart = current.length > 0 ? `Now: ${current.map((t) => t.name).join(", ")}` : null;
+                const nextPart =
+                  next.length > 0
+                    ? `Next: ${next[0].name} ${formatHM(liveWallClock(next[0].startMin, liveZeroAt))}`
+                    : null;
+                return [nowPart, nextPart].filter(Boolean).join(" · ") || "All tasks done";
+              })()}
+            </span>
+            <span className="spacer" />
+            <button onClick={endRun}>End run</button>
+          </>
+        )}
+        {doc.plan.status === "done" && <span className="live-status muted">Run finished</span>}
+        {!isLive && <span className="spacer" />}
         <button onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))} disabled={zoomIdx === 0} aria-label="Zoom out">
           −
         </button>
@@ -239,6 +354,9 @@ export default function App() {
         zoomIdx={zoomIdx}
         setZoomIdx={setZoomIdx}
         linkPredecessorId={linkPred}
+        nowMin={nowMin}
+        liveZeroAt={liveZeroAt}
+        readOnly={doc.plan.status !== "draft"}
         onTaskClick={handleTaskClick}
         onEditGroup={(g) => setEditingGroupId(g.id)}
         onTaskTimeChange={changeTaskTime}
@@ -273,7 +391,22 @@ export default function App() {
             setSettingsOpen(false);
             showToast(`Saved "${doc.plan.name}" as a template`);
           }}
+          onResetRun={doc.plan.status !== "draft" ? resetRun : undefined}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {startDialogOpen && (
+        <StartDialog doc={doc} onStart={startRun} onClose={() => setStartDialogOpen(false)} />
+      )}
+
+      {liveTaskId && liveZeroAt && (
+        <LiveTaskPanel
+          doc={doc}
+          task={doc.tasks.find((t) => t.id === liveTaskId)!}
+          liveZeroAt={liveZeroAt}
+          onComplete={completeTask}
+          onClose={() => setLiveTaskId(null)}
         />
       )}
 

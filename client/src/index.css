@@ -496,6 +496,86 @@ button.rail-cell:hover .drag-grip {
   height: 18px;
 }
 
+/* Live mode */
+.now-line {
+  position: absolute;
+  top: 0;
+  width: 2px;
+  background: #e5484d;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.now-line::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: -4px;
+  border: 5px solid transparent;
+  border-top-color: #e5484d;
+}
+
+.task-bar-current {
+  box-shadow: 0 0 0 2px #e5484d;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    filter: brightness(1);
+  }
+  50% {
+    filter: brightness(1.25);
+  }
+}
+
+.task-bar-done {
+  opacity: 0.45;
+}
+
+.task-bar-readonly {
+  cursor: pointer;
+}
+
+.btn-start {
+  background: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: white !important;
+}
+
+.live-status {
+  font-size: 0.9rem;
+  align-self: center;
+  padding: 0 0.4rem;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.live-times {
+  margin: 0 0 0.6rem;
+  color: var(--muted);
+}
+
+.live-notes {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.7rem 0.9rem;
+  margin: 0 0 0.8rem;
+  white-space: pre-wrap;
+}
+
+.shift-confirm p {
+  margin: 0.4rem 0;
+}
+
+.shift-list {
+  margin: 0.4rem 0 0.8rem;
+  padding-left: 1.2rem;
+}
+
 .toast {
   position: fixed;
   bottom: 1.2rem;

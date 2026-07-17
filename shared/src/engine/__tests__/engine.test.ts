@@ -102,6 +102,39 @@ describe("derivedTaskIds", () => {
   });
 });
 
+describe("live", () => {
+  it("proposeShift reports lateness and pending downstream tasks", async () => {
+    const { proposeShift } = await import("../live.js");
+    const tasks = [task("a", 0, 30), task("b", 30, 20), task("c", 50, 10)];
+    const deps = [dep("a", "b"), dep("b", "c")];
+    const p = proposeShift(tasks, deps, "a", 42);
+    expect(p).toEqual({ deltaMin: 12, affectedTaskIds: ["b", "c"] });
+  });
+
+  it("proposeShift returns null when on time or nothing downstream", async () => {
+    const { proposeShift } = await import("../live.js");
+    const tasks = [task("a", 0, 30), task("b", 30, 20)];
+    expect(proposeShift(tasks, [dep("a", "b")], "a", 30)).toBeNull();
+    expect(proposeShift(tasks, [], "a", 45)).toBeNull();
+  });
+
+  it("proposeShift ignores downstream tasks already done", async () => {
+    const { proposeShift } = await import("../live.js");
+    const done = { ...task("b", 30, 20), status: "done" as const };
+    const tasks = [task("a", 0, 30), done];
+    expect(proposeShift(tasks, [dep("a", "b")], "a", 40)).toBeNull();
+  });
+
+  it("current and next task detection", async () => {
+    const { currentTaskIds, nextTaskIds } = await import("../live.js");
+    const tasks = [task("a", 0, 30), task("b", 30, 20), task("c", 100, 5)];
+    expect([...currentTaskIds(tasks, 10)]).toEqual(["a"]);
+    expect([...nextTaskIds(tasks, 10)]).toEqual(["b"]);
+    expect([...currentTaskIds(tasks, 40)]).toEqual(["b"]);
+    expect([...nextTaskIds(tasks, 40)]).toEqual(["c"]);
+  });
+});
+
 describe("wallclock", () => {
   it("snaps minutes and durations", () => {
     expect(snapMin(4.4)).toBe(4);
