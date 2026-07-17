@@ -1,7 +1,8 @@
 import { useState } from "react";
 import type { PlanDoc, Task } from "@cookplan/shared";
-import { formatHM, planEndMin, snapDuration, snapMin, wallClock } from "@cookplan/shared";
+import { DEFAULT_TASK_COLOR, formatHM, planEndMin, snapDuration, snapMin, wallClock } from "@cookplan/shared";
 import Modal from "./Modal";
+import SwatchPicker from "./SwatchPicker";
 
 interface Props {
   doc: PlanDoc;
@@ -30,7 +31,7 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
     formatHM(wallClock(task.startMin, doc.plan.mode, doc.plan.anchorTime, endMin)),
   );
   const [duration, setDuration] = useState(task.durationMin);
-  const [color, setColor] = useState(task.color ?? "#6b7280");
+  const [color, setColor] = useState(task.color ?? DEFAULT_TASK_COLOR);
   const [notes, setNotes] = useState(task.notes);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
@@ -85,10 +86,10 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
           </label>
         </div>
         {!grouped && (
-          <label>
-            Colour
-            <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-          </label>
+          <div className="swatch-field">
+            <span className="swatch-label">Colour</span>
+            <SwatchPicker value={color} onChange={setColor} />
+          </div>
         )}
         {grouped && (
           <p className="muted small">Colour comes from the group.</p>

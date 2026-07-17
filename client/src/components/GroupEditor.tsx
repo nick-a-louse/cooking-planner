@@ -1,6 +1,7 @@
 import { useState } from "react";
 import type { Group } from "@cookplan/shared";
 import Modal from "./Modal";
+import SwatchPicker from "./SwatchPicker";
 
 interface Props {
   group: Group;
@@ -27,10 +28,10 @@ export default function GroupEditor({ group, onSave, onDelete, onClose }: Props)
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </label>
-        <label>
-          Colour
-          <input type="color" value={color} onChange={(e) => setColor(e.target.value)} />
-        </label>
+        <div className="swatch-field">
+          <span className="swatch-label">Colour</span>
+          <SwatchPicker value={color} onChange={setColor} />
+        </div>
         <div className="editor-actions">
           {confirmingDelete ? (
             <button type="button" className="btn-danger" onClick={() => onDelete(group.id)}>

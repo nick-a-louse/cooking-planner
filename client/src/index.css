@@ -470,10 +470,35 @@ button.rail-cell:hover {
   padding: 0.5rem 0.6rem;
 }
 
-.editor-form input[type="color"] {
-  padding: 0.15rem;
-  height: 40px;
-  width: 60px;
+.swatch-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.swatch-label {
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.swatch-grid {
+  display: grid;
+  grid-template-columns: repeat(10, 1fr);
+  gap: 6px;
+}
+
+.swatch {
+  aspect-ratio: 1;
+  width: 100%;
+  border: 2px solid transparent;
+  border-radius: 50%;
+  padding: 0;
+  cursor: pointer;
+}
+
+.swatch-selected {
+  border-color: var(--fg);
+  box-shadow: 0 0 0 2px var(--bg) inset;
 }
 
 .field-row {

@@ -67,11 +67,13 @@ export interface PlanSummary {
   updatedAt: string;
 }
 
+import { DEFAULT_TASK_COLOR } from "./palette.js";
+
 /** Rendered colour for a task: group colour wins, else own colour, else a neutral default. */
 export function taskColor(task: Task, groups: Group[]): string {
   if (task.groupId) {
     const g = groups.find((g) => g.id === task.groupId);
     if (g) return g.color;
   }
-  return task.color ?? "#6b7280";
+  return task.color ?? DEFAULT_TASK_COLOR;
 }

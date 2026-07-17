@@ -4,9 +4,8 @@ import PlanList from "./components/PlanList";
 import TimelineCanvas from "./components/Timeline/TimelineCanvas";
 import TaskEditor from "./components/TaskEditor";
 import GroupEditor from "./components/GroupEditor";
+import { nextUnusedColor } from "@cookplan/shared";
 import { usePlanStore } from "./state/planStore";
-
-const GROUP_PALETTE = ["#e11d48", "#ea580c", "#ca8a04", "#16a34a", "#0d9488", "#3b82f6", "#8b5cf6"];
 
 export default function App() {
   const { doc, closePlan, saveState, updateDoc } = usePlanStore();
@@ -54,7 +53,7 @@ export default function App() {
           id,
           planId: d.plan.id,
           name: `Group ${d.groups.length + 1}`,
-          color: GROUP_PALETTE[d.groups.length % GROUP_PALETTE.length],
+          color: nextUnusedColor(d.groups.map((g) => g.color)),
           sortOrder: d.groups.reduce((m, g) => Math.max(m, g.sortOrder), 0) + 1,
         } satisfies Group,
       ],
