@@ -260,6 +260,30 @@ button.rail-cell:hover {
 .time-axis {
   position: relative;
   height: 28px;
+  animation: axis-flash 0.8s ease-out;
+}
+
+@keyframes axis-flash {
+  0% {
+    background: color-mix(in srgb, var(--accent) 25%, transparent);
+  }
+  100% {
+    background: transparent;
+  }
+}
+
+.anchor-chip {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--fg);
+  border-radius: 999px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.85rem;
+  white-space: nowrap;
+}
+
+.anchor-chip:hover {
+  border-color: var(--accent);
 }
 
 .axis-tick {

@@ -147,6 +147,7 @@ export default function TimelineCanvas({
         <div className="timeline-row axis-header">
           <div className="rail-cell" />
           <TimeAxis
+            key={`${plan.mode}|${plan.anchorTime}`}
             totalMin={totalMin}
             pxPerMin={pxPerMin}
             mode={plan.mode}

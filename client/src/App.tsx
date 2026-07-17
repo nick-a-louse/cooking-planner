@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import type { Group, Task } from "@cookplan/shared";
+import type { Group, Plan, Task } from "@cookplan/shared";
 import { nextUnusedColor, predecessorsOf, wouldCreateCycle } from "@cookplan/shared";
 import PlanList from "./components/PlanList";
 import TimelineCanvas from "./components/Timeline/TimelineCanvas";
 import TaskEditor from "./components/TaskEditor";
 import GroupEditor from "./components/GroupEditor";
+import PlanSettings from "./components/PlanSettings";
 import { usePlanStore } from "./state/planStore";
 
 export default function App() {
@@ -13,6 +14,7 @@ export default function App() {
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
   const [linking, setLinking] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [linkPred, setLinkPred] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -177,6 +179,16 @@ export default function App() {
     setLinkPred(null);
   };
 
+  const savePlanSettings = (updated: Plan) => {
+    updateDoc((d) => ({ ...d, plan: updated }));
+    setSettingsOpen(false);
+    showToast(
+      updated.mode === "backward"
+        ? `Times now work backward from ${updated.anchorTime.slice(11, 16)}`
+        : `Times now run forward from ${updated.anchorTime.slice(11, 16)}`,
+    );
+  };
+
   const handleLockedDragAttempt = (task: Task) => {
     const predNames = predecessorsOf(task.id, doc.deps)
       .map((id) => doc.tasks.find((t) => t.id === id)?.name)
@@ -190,6 +202,9 @@ export default function App() {
       <header className="plan-header">
         <button onClick={closePlan}>← Plans</button>
         <h2>{doc.plan.name}</h2>
+        <button className="anchor-chip" onClick={() => setSettingsOpen(true)} title="Plan settings">
+          {doc.plan.mode === "backward" ? "Finish" : "Start"} {doc.plan.anchorTime.slice(11, 16)}
+        </button>
         <span className={`save-state save-${saveState}`}>
           {saveState === "saving" ? "Saving…" : saveState === "error" ? "Save failed" : "Saved"}
         </span>
@@ -245,6 +260,10 @@ export default function App() {
           onDelete={deleteGroup}
           onClose={() => setEditingGroupId(null)}
         />
+      )}
+
+      {settingsOpen && (
+        <PlanSettings plan={doc.plan} onSave={savePlanSettings} onClose={() => setSettingsOpen(false)} />
       )}
 
       {toast && <div className="toast">{toast}</div>}
