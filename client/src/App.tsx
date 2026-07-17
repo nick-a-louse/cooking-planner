@@ -12,6 +12,7 @@ export default function App() {
   const { doc, closePlan, saveState, updateDoc } = usePlanStore();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
+  const [zoomIdx, setZoomIdx] = useState(1);
 
   if (!doc) return <PlanList />;
 
@@ -86,6 +87,32 @@ export default function App() {
     setEditingGroupId(null);
   };
 
+  const changeTaskTime = (taskId: string, startMin: number, durationMin: number) => {
+    updateDoc((d) => ({
+      ...d,
+      tasks: d.tasks.map((t) => (t.id === taskId ? { ...t, startMin, durationMin } : t)),
+    }));
+  };
+
+  const reorderTasks = (orderedIds: string[], movedId: string) => {
+    updateDoc((d) => {
+      const byId = new Map(d.tasks.map((t) => [t.id, t]));
+      const movedIdx = orderedIds.indexOf(movedId);
+      // The moved task adopts the group of its new neighbourhood: the task
+      // above it if any, otherwise the task below.
+      const neighbourId = movedIdx > 0 ? orderedIds[movedIdx - 1] : orderedIds[movedIdx + 1];
+      const newGroupId = neighbourId ? (byId.get(neighbourId)?.groupId ?? null) : null;
+      return {
+        ...d,
+        tasks: orderedIds.map((id, i) => {
+          const t = byId.get(id)!;
+          const groupId = id === movedId ? newGroupId : t.groupId;
+          return { ...t, groupId, sortOrder: i };
+        }),
+      };
+    });
+  };
+
   const deleteGroup = (groupId: string) => {
     updateDoc((d) => ({
       ...d,
@@ -108,12 +135,23 @@ export default function App() {
       <div className="toolbar">
         <button onClick={addTask}>+ Task</button>
         <button onClick={addGroup}>+ Group</button>
+        <span className="spacer" />
+        <button onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))} disabled={zoomIdx === 0} aria-label="Zoom out">
+          −
+        </button>
+        <button onClick={() => setZoomIdx(Math.min(2, zoomIdx + 1))} disabled={zoomIdx === 2} aria-label="Zoom in">
+          +
+        </button>
       </div>
 
       <TimelineCanvas
         doc={doc}
+        zoomIdx={zoomIdx}
+        setZoomIdx={setZoomIdx}
         onEditTask={(t) => setEditingTaskId(t.id)}
         onEditGroup={(g) => setEditingGroupId(g.id)}
+        onTaskTimeChange={changeTaskTime}
+        onReorder={reorderTasks}
       />
 
       {editingTask && (

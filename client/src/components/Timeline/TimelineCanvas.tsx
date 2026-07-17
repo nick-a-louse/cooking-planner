@@ -1,16 +1,29 @@
-import { useMemo } from "react";
+import { useMemo, useRef } from "react";
+import {
+  DndContext,
+  MouseSensor,
+  TouchSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type DragEndEvent,
+} from "@dnd-kit/core";
+import { SortableContext, arrayMove, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Group, PlanDoc, Task } from "@cookplan/shared";
 import { planEndMin } from "@cookplan/shared";
 import TimeAxis from "./TimeAxis";
 import TaskBar from "./TaskBar";
-
-const PX_PER_MIN = 4;
-const RAIL_W = 160;
+import { RAIL_W, ZOOM_LEVELS, useZoomPan } from "../../hooks/useZoomPan";
 
 interface Props {
   doc: PlanDoc;
+  zoomIdx: number;
+  setZoomIdx: (idx: number) => void;
   onEditTask: (task: Task) => void;
   onEditGroup: (group: Group) => void;
+  onTaskTimeChange: (taskId: string, startMin: number, durationMin: number) => void;
+  onReorder: (orderedTaskIds: string[], movedTaskId: string) => void;
 }
 
 interface Section {
@@ -18,11 +31,61 @@ interface Section {
   tasks: Task[];
 }
 
-export default function TimelineCanvas({ doc, onEditTask, onEditGroup }: Props) {
+function SortableTaskRow({
+  task,
+  children,
+  onEdit,
+}: {
+  task: Task;
+  children: React.ReactNode;
+  onEdit: () => void;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: task.id,
+  });
+  return (
+    <div
+      ref={setNodeRef}
+      className={`timeline-row task-row-line${isDragging ? " row-dragging" : ""}`}
+      style={{ transform: CSS.Transform.toString(transform), transition }}
+    >
+      <button
+        className="rail-cell task-cell"
+        onClick={onEdit}
+        onContextMenu={(e) => e.preventDefault()}
+        {...attributes}
+        {...listeners}
+      >
+        <span className="drag-grip" aria-hidden>
+          ⠿
+        </span>
+        {task.name}
+      </button>
+      {children}
+    </div>
+  );
+}
+
+export default function TimelineCanvas({
+  doc,
+  zoomIdx,
+  setZoomIdx,
+  onEditTask,
+  onEditGroup,
+  onTaskTimeChange,
+  onReorder,
+}: Props) {
   const { plan, groups, tasks } = doc;
+  const pxPerMin = ZOOM_LEVELS[zoomIdx];
   const endMin = planEndMin(tasks);
-  // Round the visible range up to the next half hour, with breathing room.
   const totalMin = Math.max(120, Math.ceil((endMin + 30) / 30) * 30);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  useZoomPan(scrollRef, zoomIdx, setZoomIdx);
+
+  const sensors = useSensors(
+    useSensor(MouseSensor, { activationConstraint: { distance: 5 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
+  );
 
   const sections = useMemo<Section[]>(() => {
     const byGroup: Section[] = [...groups]
@@ -38,65 +101,81 @@ export default function TimelineCanvas({ doc, onEditTask, onEditGroup }: Props) 
     return byGroup;
   }, [groups, tasks]);
 
+  const flatTaskIds = useMemo(() => sections.flatMap((s) => s.tasks.map((t) => t.id)), [sections]);
+
+  const handleDragEnd = (e: DragEndEvent) => {
+    const { active, over } = e;
+    if (!over || active.id === over.id) return;
+    const oldIdx = flatTaskIds.indexOf(String(active.id));
+    const newIdx = flatTaskIds.indexOf(String(over.id));
+    if (oldIdx < 0 || newIdx < 0) return;
+    onReorder(arrayMove(flatTaskIds, oldIdx, newIdx), String(active.id));
+  };
+
   return (
-    <div className="timeline-scroll">
-      <div className="timeline-inner" style={{ width: RAIL_W + totalMin * PX_PER_MIN }}>
+    <div className="timeline-scroll" ref={scrollRef}>
+      <div className="timeline-inner" style={{ width: RAIL_W + totalMin * pxPerMin }}>
         <div className="timeline-row axis-header">
           <div className="rail-cell" />
           <TimeAxis
             totalMin={totalMin}
-            pxPerMin={PX_PER_MIN}
+            pxPerMin={pxPerMin}
             mode={plan.mode}
             anchorTime={plan.anchorTime}
             endMin={endMin}
           />
         </div>
 
-        {sections.map((section) => (
-          <div key={section.group?.id ?? "__ungrouped"} className="timeline-section">
-            {section.group ? (
-              <div className="timeline-row group-row">
-                <button
-                  className="rail-cell group-cell"
-                  onClick={() => onEditGroup(section.group!)}
-                  title="Edit group"
-                >
-                  <span className="group-dot" style={{ background: section.group.color }} />
-                  {section.group.name}
-                </button>
-                <div className="track group-track" />
-              </div>
-            ) : (
-              sections.length > 1 && (
-                <div className="timeline-row group-row">
-                  <div className="rail-cell group-cell muted">Ungrouped</div>
-                  <div className="track group-track" />
-                </div>
-              )
-            )}
-            {section.tasks.map((task) => (
-              <div key={task.id} className="timeline-row task-row-line">
-                <button className="rail-cell task-cell" onClick={() => onEditTask(task)}>
-                  {task.name}
-                </button>
-                <div className="track">
-                  <TaskBar
-                    task={task}
-                    groups={groups}
-                    pxPerMin={PX_PER_MIN}
-                    onClick={() => onEditTask(task)}
-                  />
-                </div>
+        <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
+          <SortableContext items={flatTaskIds} strategy={verticalListSortingStrategy}>
+            {sections.map((section) => (
+              <div key={section.group?.id ?? "__ungrouped"} className="timeline-section">
+                {section.group ? (
+                  <div className="timeline-row group-row">
+                    <button
+                      className="rail-cell group-cell"
+                      onClick={() => onEditGroup(section.group!)}
+                      title="Edit group"
+                    >
+                      <span className="group-dot" style={{ background: section.group.color }} />
+                      {section.group.name}
+                    </button>
+                    <div className="track group-track" />
+                  </div>
+                ) : (
+                  sections.length > 1 && (
+                    <div className="timeline-row group-row">
+                      <div className="rail-cell group-cell muted">Ungrouped</div>
+                      <div className="track group-track" />
+                    </div>
+                  )
+                )}
+                {section.tasks.map((task) => (
+                  <SortableTaskRow key={task.id} task={task} onEdit={() => onEditTask(task)}>
+                    <div className="track">
+                      <TaskBar
+                        task={task}
+                        groups={groups}
+                        pxPerMin={pxPerMin}
+                        mode={plan.mode}
+                        anchorTime={plan.anchorTime}
+                        endMin={endMin}
+                        onClick={() => onEditTask(task)}
+                        onCommit={(s, d) => onTaskTimeChange(task.id, s, d)}
+                      />
+                    </div>
+                  </SortableTaskRow>
+                ))}
+                {section.tasks.length === 0 && (
+                  <div className="timeline-row task-row-line">
+                    <div className="rail-cell task-cell muted empty-hint">No tasks yet</div>
+                    <div className="track" />
+                  </div>
+                )}
               </div>
             ))}
-            {section.tasks.length === 0 && (
-              <div className="timeline-row task-row-line">
-                <div className="rail-cell task-cell muted empty-hint">No tasks yet</div>
-                <div className="track" />
-              </div>
-            )}
-          </div>
-        ))}
+          </SortableContext>
+        </DndContext>
       </div>
     </div>
   );
