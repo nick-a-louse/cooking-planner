@@ -11,6 +11,8 @@ interface Props {
 }
 
 const BAR_MID = 20;
+const BAR_TOP = 6;
+const BAR_BOTTOM = 34;
 
 export default function DependencyLines({ tasks, deps, taskRowY, pxPerMin, railW, width, height }: Props) {
   const byId = new Map(tasks.map((t) => [t.id, t]));
@@ -31,11 +33,19 @@ export default function DependencyLines({ tasks, deps, taskRowY, pxPerMin, railW
         const y1 = y1Base + BAR_MID;
         const x2 = railW + succ.startMin * pxPerMin;
         const y2 = y2Base + BAR_MID;
-        const elbowX = Math.max(x1, x2) + 8;
-        const path =
-          x2 >= x1 + 14
-            ? `M ${x1} ${y1} L ${x1 + 7} ${y1} L ${x1 + 7} ${y2} L ${x2 - 2} ${y2}`
-            : `M ${x1} ${y1} L ${elbowX} ${y1} L ${elbowX} ${y2} L ${x2 - 2} ${y2}`;
+        let path: string;
+        if (x2 >= x1 + 16) {
+          // Room for a classic elbow: out of the predecessor's end, across,
+          // and into the successor's left edge.
+          path = `M ${x1} ${y1} L ${x1 + 7} ${y1} L ${x1 + 7} ${y2} L ${x2 - 2} ${y2}`;
+        } else {
+          // Successor starts at (or just after) the predecessor's end: drop
+          // vertically into the successor's top or bottom edge instead of
+          // doubling back into its side.
+          const xEntry = x2 + 7;
+          const yEntry = y2Base > y1Base ? y2Base + BAR_TOP - 2 : y2Base + BAR_BOTTOM + 2;
+          path = `M ${x1} ${y1} L ${xEntry} ${y1} L ${xEntry} ${yEntry}`;
+        }
         return (
           <path
             key={`${d.predecessorId}-${d.successorId}`}

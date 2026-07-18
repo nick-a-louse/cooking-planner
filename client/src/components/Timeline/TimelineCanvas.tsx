@@ -32,6 +32,7 @@ interface Props {
   /** Live/finished plans: no drag editing, taps only. */
   readOnly: boolean;
   onTaskClick: (task: Task) => void;
+  onAddTask: (groupId: string | null) => void;
   onEditGroup: (group: Group) => void;
   onTaskTimeChange: (taskId: string, startMin: number, durationMin: number) => void;
   onReorder: (orderedTaskIds: string[], movedTaskId: string) => void;
@@ -87,6 +88,7 @@ export default function TimelineCanvas({
   liveZeroAt,
   readOnly,
   onTaskClick,
+  onAddTask,
   onEditGroup,
   onTaskTimeChange,
   onReorder,
@@ -137,9 +139,10 @@ export default function TimelineCanvas({
         map.set(t.id, y);
         y += ROW_H;
       }
+      if (!readOnly) y += ROW_H;
     }
     return { taskRowY: map, totalH: y };
-  }, [sections]);
+  }, [sections, readOnly]);
 
   const handleDragEnd = (e: DragEndEvent) => {
     const { active, over } = e;
@@ -217,7 +220,18 @@ export default function TimelineCanvas({
                     </div>
                   </SortableTaskRow>
                 ))}
-                {section.tasks.length === 0 && (
+                {!readOnly && (
+                  <div className="timeline-row task-row-line add-row">
+                    <button
+                      className="rail-cell task-cell add-cell"
+                      onClick={() => onAddTask(section.group?.id ?? null)}
+                    >
+                      + Add task
+                    </button>
+                    <div className="track" />
+                  </div>
+                )}
+                {readOnly && section.tasks.length === 0 && (
                   <div className="timeline-row task-row-line">
                     <div className="rail-cell task-cell muted empty-hint">No tasks yet</div>
                     <div className="track" />

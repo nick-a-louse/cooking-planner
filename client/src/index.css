@@ -339,6 +339,19 @@ button.rail-cell:hover {
   font-style: italic;
 }
 
+.add-cell {
+  color: var(--muted) !important;
+  font-size: 0.85rem;
+}
+
+.add-cell:hover {
+  color: var(--accent) !important;
+}
+
+.add-row {
+  border-bottom-style: dashed;
+}
+
 .track {
   position: relative;
   flex: 1;

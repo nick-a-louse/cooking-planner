@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { Plan, PlanMode } from "@cookplan/shared";
 import Modal from "./Modal";
+import { planNameTaken } from "./PlanList";
+import { usePlanStore } from "../state/planStore";
 
 interface Props {
   plan: Plan;
@@ -15,6 +17,8 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
   const [name, setName] = useState(plan.name);
   const [mode, setMode] = useState<PlanMode>(plan.mode);
   const [anchorTime, setAnchorTime] = useState(plan.anchorTime);
+  const plans = usePlanStore((s) => s.plans);
+  const taken = planNameTaken(plans, name, plan.id);
 
   return (
     <Modal title="Plan settings" onClose={onClose}>
@@ -22,6 +26,7 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
         className="editor-form"
         onSubmit={(e) => {
           e.preventDefault();
+          if (taken) return;
           onSave({ ...plan, name: name.trim() || plan.name, mode, anchorTime });
         }}
       >
@@ -29,6 +34,7 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
           Name
           <input value={name} onChange={(e) => setName(e.target.value)} />
         </label>
+        {taken && <p className="error small">A plan with this name already exists.</p>}
         <fieldset className="preds-field">
           <legend className="swatch-label">Scheduling</legend>
           <label className="pred-option">
@@ -77,7 +83,7 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn-primary">
+          <button type="submit" className="btn-primary" disabled={taken}>
             Save
           </button>
         </div>

@@ -3,6 +3,12 @@ import type { PlanSummary } from "@cookplan/shared";
 import Modal from "./Modal";
 import { usePlanStore } from "../state/planStore";
 
+/** Case-insensitive, trimmed name collision check against loaded plans. */
+export function planNameTaken(plans: PlanSummary[], name: string, excludeId?: string): boolean {
+  const n = name.trim().toLowerCase();
+  return plans.some((p) => p.id !== excludeId && p.name.trim().toLowerCase() === n);
+}
+
 function UseTemplateDialog({
   template,
   onClose,
@@ -11,8 +17,10 @@ function UseTemplateDialog({
   onClose: () => void;
 }) {
   const useTemplate = usePlanStore((s) => s.useTemplate);
+  const plans = usePlanStore((s) => s.plans);
   const [name, setName] = useState(template.name.replace(/\s*template$/i, ""));
   const [anchorTime, setAnchorTime] = useState(template.anchorTime);
+  const taken = planNameTaken(plans, name);
 
   return (
     <Modal title="New plan from template" onClose={onClose}>
@@ -20,7 +28,8 @@ function UseTemplateDialog({
         className="editor-form"
         onSubmit={(e) => {
           e.preventDefault();
-          void useTemplate(template.id, name.trim() || template.name, anchorTime);
+          if (taken || !name.trim()) return;
+          void useTemplate(template.id, name.trim(), anchorTime);
           onClose();
         }}
       >
@@ -28,6 +37,7 @@ function UseTemplateDialog({
           Plan name
           <input value={name} onChange={(e) => setName(e.target.value)} autoFocus />
         </label>
+        {taken && <p className="error small">A plan with this name already exists — pick another.</p>}
         <label>
           {template.mode === "backward" ? "Finish time" : "Start time"}
           <input
@@ -42,7 +52,7 @@ function UseTemplateDialog({
           <button type="button" onClick={onClose}>
             Cancel
           </button>
-          <button type="submit" className="btn-primary">
+          <button type="submit" className="btn-primary" disabled={taken || !name.trim()}>
             Create plan
           </button>
         </div>
@@ -62,6 +72,7 @@ export default function PlanList() {
 
   const realPlans = plans.filter((p) => !p.isTemplate);
   const templates = plans.filter((p) => p.isTemplate);
+  const newNameTaken = planNameTaken(plans, newName);
 
   return (
     <div className="plan-list">
@@ -71,7 +82,7 @@ export default function PlanList() {
         className="new-plan-form"
         onSubmit={(e) => {
           e.preventDefault();
-          if (!newName.trim()) return;
+          if (!newName.trim() || newNameTaken) return;
           void createPlan(newName.trim());
           setNewName("");
         }}
@@ -82,10 +93,11 @@ export default function PlanList() {
           placeholder="New plan name, e.g. Christmas Dinner"
           aria-label="New plan name"
         />
-        <button type="submit" disabled={!newName.trim()}>
+        <button type="submit" disabled={!newName.trim() || newNameTaken}>
           Create
         </button>
       </form>
+      {newNameTaken && <p className="error small">A plan with this name already exists.</p>}
 
       {error && <p className="error">{error}</p>}
       {plansLoading && plans.length === 0 && <p className="muted">Loading…</p>}

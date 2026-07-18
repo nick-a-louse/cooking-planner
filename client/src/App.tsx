@@ -73,7 +73,7 @@ export default function App() {
   const editingTask = doc.tasks.find((t) => t.id === editingTaskId) ?? null;
   const editingGroup = doc.groups.find((g) => g.id === editingGroupId) ?? null;
 
-  const addTask = (kind: Task["kind"] = "task") => {
+  const addTask = (kind: Task["kind"] = "task", groupId: string | null = null) => {
     const id = crypto.randomUUID();
     updateDoc((d) => ({
       ...d,
@@ -82,7 +82,7 @@ export default function App() {
         {
           id,
           planId: d.plan.id,
-          groupId: null,
+          groupId,
           kind,
           name: kind === "wait" ? "Wait" : "New task",
           startMin: 0,
@@ -358,6 +358,7 @@ export default function App() {
         liveZeroAt={liveZeroAt}
         readOnly={doc.plan.status !== "draft"}
         onTaskClick={handleTaskClick}
+        onAddTask={(groupId) => addTask("task", groupId)}
         onEditGroup={(g) => setEditingGroupId(g.id)}
         onTaskTimeChange={changeTaskTime}
         onReorder={reorderTasks}
