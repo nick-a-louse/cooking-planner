@@ -1,0 +1,13 @@
+services:
+  cooking-planner:
+    build: .
+    image: cooking-planner:latest
+    container_name: cooking-planner
+    ports:
+      - "3005:3001"
+    volumes:
+      - cookplan-data:/data
+    restart: unless-stopped
+
+volumes:
+  cookplan-data:
