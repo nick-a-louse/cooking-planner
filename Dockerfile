@@ -25,6 +25,8 @@ COPY shared/src shared/src
 COPY server/src server/src
 COPY --from=build /app/client/dist client/dist
 EXPOSE 3001
+# 127.0.0.1, not localhost: the server binds 0.0.0.0 (IPv4 only), but localhost
+# resolves ::1 first in the image, so wget would hit IPv6 and get refused.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD wget -qO- http://localhost:3001/api/health || exit 1
+  CMD wget -qO- http://127.0.0.1:3001/api/health || exit 1
 CMD ["npx", "tsx", "server/src/index.ts"]
