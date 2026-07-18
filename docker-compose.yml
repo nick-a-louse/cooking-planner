@@ -4,10 +4,9 @@ services:
     image: cooking-planner:latest
     container_name: cooking-planner
     ports:
-      - "3005:3001"
+      - "${HOST_PORT:-3005}:3001"
     volumes:
-      - cookplan-data:/data
+      # Host path for the SQLite DB. Set DATA_DIR in .env (the home server uses
+      # /opt/appdata/cooking-planner); defaults to ./data for local runs.
+      - ${DATA_DIR:-./data}:/data
     restart: unless-stopped
-
-volumes:
-  cookplan-data:

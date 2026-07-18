@@ -12,7 +12,20 @@ docker compose up -d --build
 ```
 
 App is then on http://<host>:3005 (compose maps 3005 → container 3001).
-Data lives in the `cookplan-data` named volume.
+Data lives in `./data` unless `DATA_DIR` says otherwise.
+
+### Host paths
+
+`docker-compose.yml` reads two optional variables from a `.env` file beside it:
+
+```ini
+DATA_DIR=/opt/appdata/cooking-planner
+HOST_PORT=3005
+```
+
+On Nick's home server the stack lives in `/srv/cooking-planner` (compose +
+source) with its DB bind-mounted from `/opt/appdata/cooking-planner`, matching
+the convention used by the other stacks there.
 
 ## Manual build/run
 
@@ -20,7 +33,7 @@ Data lives in the `cookplan-data` named volume.
 docker build -t cooking-planner .
 docker run -d --name cooking-planner \
   -p 3005:3001 \
-  -v cookplan-data:/data \
+  -v /opt/appdata/cooking-planner:/data \
   --restart unless-stopped \
   cooking-planner
 ```
@@ -50,8 +63,15 @@ across image rebuilds.
 
 ## Backup
 
-The whole state is one file. Either back up the `cookplan-data` volume, or:
+State is a SQLite DB in write-ahead-logging mode, so it is **three** files:
+`app.db`, `app.db-wal`, and `app.db-shm`. Most recent writes live in the `-wal`
+file until a checkpoint, so copying `app.db` alone can lose data.
+
+Back up the directory, not the single file:
 
 ```bash
-docker run --rm -v cookplan-data:/data alpine cat /data/app.db > cookplan-backup.db
+tar czf cookplan-backup-$(date +%F).tar.gz -C /opt/appdata/cooking-planner .
 ```
+
+To force a checkpoint into `app.db` first, stop the container (`docker compose
+stop`) before copying.
