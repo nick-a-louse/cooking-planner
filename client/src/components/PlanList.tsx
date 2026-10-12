@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import type { PlanSummary } from "@cookplan/shared";
 import Modal from "./Modal";
+import AppHeader from "./AppHeader";
+import AppFooter from "./AppFooter";
+import ConfirmDialog from "./ConfirmDialog";
 import { usePlanStore } from "../state/planStore";
 
 /** Case-insensitive, trimmed name collision check against loaded plans. */
@@ -65,6 +68,7 @@ export default function PlanList() {
   const { plans, plansLoading, error, loadPlans, createPlan, deletePlan, openPlan } = usePlanStore();
   const [newName, setNewName] = useState("");
   const [usingTemplate, setUsingTemplate] = useState<PlanSummary | null>(null);
+  const [deleting, setDeleting] = useState<PlanSummary | null>(null);
 
   useEffect(() => {
     void loadPlans();
@@ -73,10 +77,14 @@ export default function PlanList() {
   const realPlans = plans.filter((p) => !p.isTemplate);
   const templates = plans.filter((p) => p.isTemplate);
   const newNameTaken = planNameTaken(plans, newName);
+  // Updated line: the most recent change to any plan or template.
+  const lastChange = plans.reduce((m, p) => (p.updatedAt > m ? p.updatedAt : m), "");
+  const loaded = !(plansLoading && plans.length === 0);
 
   return (
-    <div className="plan-list">
-      <h1>🍳 Cooking Planner</h1>
+    <>
+    <AppHeader title="Cooking Planner" updatedIso={loaded ? lastChange : null} emptyText="No plans yet" />
+    <main className="wrap plan-list">
 
       <form
         className="new-plan-form"
@@ -93,14 +101,13 @@ export default function PlanList() {
           placeholder="New plan name, e.g. Christmas Dinner"
           aria-label="New plan name"
         />
-        <button type="submit" disabled={!newName.trim() || newNameTaken}>
-          Create
+        <button type="submit" className="btn btn-primary" disabled={!newName.trim() || newNameTaken}>
+          Create plan
         </button>
       </form>
       {newNameTaken && <p className="error small">A plan with this name already exists.</p>}
 
       {error && <p className="error">{error}</p>}
-      {plansLoading && plans.length === 0 && <p className="muted">Loading…</p>}
       {!plansLoading && realPlans.length === 0 && (
         <p className="muted">No plans yet — create your first meal plan above.</p>
       )}
@@ -115,14 +122,8 @@ export default function PlanList() {
                 {p.anchorTime.replace("T", " ")} · {p.status}
               </span>
             </button>
-            <button
-              className="plan-delete"
-              title="Delete plan"
-              onClick={() => {
-                if (confirm(`Delete "${p.name}"?`)) void deletePlan(p.id);
-              }}
-            >
-              ✕
+            <button className="plan-delete" title="Delete plan" aria-label={`Delete ${p.name}`} onClick={() => setDeleting(p)}>
+              <CrossIcon />
             </button>
           </li>
         ))}
@@ -135,19 +136,13 @@ export default function PlanList() {
             {templates.map((t) => (
               <li key={t.id} className="plan-card">
                 <button className="plan-open" onClick={() => setUsingTemplate(t)}>
-                  <span className="plan-name">📋 {t.name}</span>
+                  <span className="plan-name">{t.name}</span>
                   <span className="plan-meta">
                     {t.mode === "backward" ? "Backward" : "Forward"} plan — tap to use
                   </span>
                 </button>
-                <button
-                  className="plan-delete"
-                  title="Delete template"
-                  onClick={() => {
-                    if (confirm(`Delete template "${t.name}"?`)) void deletePlan(t.id);
-                  }}
-                >
-                  ✕
+                <button className="plan-delete" title="Delete template" aria-label={`Delete ${t.name}`} onClick={() => setDeleting(t)}>
+                  <CrossIcon />
                 </button>
               </li>
             ))}
@@ -158,6 +153,25 @@ export default function PlanList() {
       {usingTemplate && (
         <UseTemplateDialog template={usingTemplate} onClose={() => setUsingTemplate(null)} />
       )}
-    </div>
+      {deleting && (
+        <ConfirmDialog
+          title={deleting.isTemplate ? "Delete template" : "Delete plan"}
+          message={`Delete "${deleting.name}"? This can't be undone.`}
+          confirmLabel="Delete"
+          onConfirm={() => void deletePlan(deleting.id)}
+          onClose={() => setDeleting(null)}
+        />
+      )}
+    </main>
+    <AppFooter />
+    </>
+  );
+}
+
+function CrossIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
   );
 }

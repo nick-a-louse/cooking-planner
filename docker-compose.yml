@@ -1,12 +1,17 @@
+# What runs on gomez, in /srv/cooking-planner (alongside .env). The image is built by GitHub Actions.
 services:
   cooking-planner:
-    build: .
-    image: cooking-planner:latest
+    image: ghcr.io/nick-a-louse/cooking-planner:latest
     container_name: cooking-planner
-    ports:
-      - "${HOST_PORT:-3005}:3001"
-    volumes:
-      # Host path for the SQLite DB. Set DATA_DIR in .env (the home server uses
-      # /opt/appdata/cooking-planner); defaults to ./data for local runs.
-      - ${DATA_DIR:-./data}:/data
     restart: unless-stopped
+    user: "${PUID:-1003}:${PGID:-1006}"   # PUID/PGID live in .env, like the linuxserver containers
+    env_file: .env
+    ports:
+      - "3005:8000"          # registered in Obsidian: App standard → Port register
+    volumes:
+      - /opt/appdata/cooking-planner:/data   # SQLite: app.db + app.db-wal + app.db-shm
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

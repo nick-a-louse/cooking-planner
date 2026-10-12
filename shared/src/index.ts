@@ -4,3 +4,4 @@ export * from "./engine/wallclock.js";
 export * from "./engine/cycles.js";
 export * from "./engine/reflow.js";
 export * from "./engine/live.js";
+export * from "./version.js";

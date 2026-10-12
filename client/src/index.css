@@ -1,33 +1,9 @@
+/* Cooking Planner: app-specific styles on top of gomez-ui.css (TECH-P8 / TECH-60).
+   gomez-ui (loaded in index.html) provides fonts, neutrals, header, buttons, width and footer.
+   This file sets the accent and styles the plan list, toolbar, timeline and dialogs. */
+
 :root {
-  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
-  color-scheme: light dark;
-  --bg: #ffffff;
-  --fg: #111827;
-  --muted: #6b7280;
-  --border: #e5e7eb;
-  --accent: #3b82f6;
-  --danger: #dc2626;
-  --card: #f9fafb;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --bg: #111827;
-    --fg: #f9fafb;
-    --muted: #9ca3af;
-    --border: #374151;
-    --card: #1f2937;
-  }
-}
-
-* {
-  box-sizing: border-box;
-}
-
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
+  --accent-l: #7b3a72; --accent-d: #d99ad0;   /* registered accent: plum */
 }
 
 button {
@@ -40,51 +16,39 @@ button {
 }
 
 .error {
-  color: var(--danger);
+  color: var(--bad);
 }
 
 /* Plan list */
 .plan-list {
-  max-width: 640px;
-  margin: 0 auto;
-  padding: 1.5rem 1rem;
+  padding-block: 20px 40px;
 }
 
 .new-plan-form {
   display: flex;
   gap: 0.5rem;
   margin-bottom: 1.5rem;
+  max-width: 720px;
 }
 
 .new-plan-form input {
   flex: 1;
+  min-width: 0;
   font: inherit;
-  padding: 0.6rem 0.8rem;
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  background: var(--bg);
-  color: var(--fg);
-}
-
-.new-plan-form button {
-  padding: 0.6rem 1.2rem;
-  border: none;
-  border-radius: 8px;
-  background: var(--accent);
-  color: white;
-}
-
-.new-plan-form button:disabled {
-  opacity: 0.5;
-  cursor: default;
+  padding: 0.55rem 0.8rem;
+  min-height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
 }
 
 .plan-cards {
   list-style: none;
   padding: 0;
   margin: 0;
-  display: flex;
-  flex-direction: column;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
   gap: 0.6rem;
 }
 
@@ -101,10 +65,10 @@ button {
   align-items: flex-start;
   gap: 0.2rem;
   padding: 0.8rem 1rem;
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 10px;
-  background: var(--card);
-  color: var(--fg);
+  background: var(--surface);
+  color: var(--ink);
   text-align: left;
 }
 
@@ -122,8 +86,11 @@ button {
 }
 
 .plan-delete {
-  border: 1px solid var(--border);
-  border-radius: 10px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
   background: none;
   color: var(--muted);
   padding: 0 0.9rem;
@@ -131,77 +98,61 @@ button {
 }
 
 .plan-delete:hover {
-  color: var(--danger);
-  border-color: var(--danger);
+  color: var(--bad);
+  border-color: var(--bad);
 }
 
 /* Plan view */
-.plan-header {
-  display: flex;
-  align-items: center;
-  gap: 0.8rem;
-  padding: 0.8rem 1rem;
-  border-bottom: 1px solid var(--border);
-}
-
-.plan-header h2 {
-  margin: 0;
-  font-size: 1.1rem;
-  flex: 1;
-}
-
-.plan-header button {
-  border: 1px solid var(--border);
-  background: none;
-  color: var(--fg);
-  border-radius: 8px;
-  padding: 0.4rem 0.8rem;
-}
-
-.save-state {
-  font-size: 0.85rem;
-  color: var(--muted);
-}
-
-.save-error {
-  color: var(--danger);
-}
-
-.small {
-  font-size: 0.85rem;
-}
-
 /* Toolbar */
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
-  padding: 0.6rem 1rem;
-  border-bottom: 1px solid var(--border);
+  padding-block: 0.6rem;
 }
 
 .toolbar button {
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--fg);
-  border-radius: 8px;
-  padding: 0.45rem 0.9rem;
+  border: 1px solid var(--line-strong);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-weight: 600;
+  padding: 0.4rem 0.9rem;
   min-height: 40px;
 }
 
 .toolbar button:hover {
-  border-color: var(--accent);
+  border-color: var(--ink);
 }
 
-/* Timeline */
+/* Timeline: fills the rest of the screen, inside the (full-width) column */
+/* .wrap uses auto margins, which would shrink a flex child to its content: keep it full width */
+.plan-view > .wrap {
+  width: 100%;
+}
+
+.timeline-wrap {
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+}
+
 .timeline-scroll {
   overflow: auto;
   flex: 1;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-sm);
+  margin-bottom: 12px;
 }
 
 .plan-view {
   display: flex;
   flex-direction: column;
   height: 100vh;
+  height: 100dvh;
 }
 
 .timeline-inner {
@@ -211,7 +162,7 @@ button {
 .timeline-row {
   display: flex;
   align-items: stretch;
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 
 .rail-cell {
@@ -222,7 +173,7 @@ button {
   width: 160px;
   padding: 0.4rem 0.6rem;
   background: var(--bg);
-  border-right: 1px solid var(--border);
+  border-right: 1px solid var(--line);
   font-size: 0.9rem;
   display: flex;
   align-items: center;
@@ -236,7 +187,7 @@ button.rail-cell {
   border-top: none;
   border-bottom: none;
   border-left: none;
-  color: var(--fg);
+  color: var(--ink);
   text-align: left;
   cursor: pointer;
 }
@@ -250,7 +201,7 @@ button.rail-cell:hover {
   top: 0;
   z-index: 3;
   background: var(--bg);
-  border-bottom: 1px solid var(--border);
+  border-bottom: 1px solid var(--line);
 }
 
 .axis-header .rail-cell {
@@ -272,25 +223,11 @@ button.rail-cell:hover {
   }
 }
 
-.anchor-chip {
-  border: 1px solid var(--border);
-  background: var(--card);
-  color: var(--fg);
-  border-radius: 999px;
-  padding: 0.3rem 0.9rem;
-  font-size: 0.85rem;
-  white-space: nowrap;
-}
-
-.anchor-chip:hover {
-  border-color: var(--accent);
-}
-
 .axis-tick {
   position: absolute;
   top: 0;
   bottom: 0;
-  border-left: 1px solid var(--border);
+  border-left: 1px solid var(--line);
   padding-left: 3px;
 }
 
@@ -300,14 +237,14 @@ button.rail-cell:hover {
 }
 
 .group-row {
-  background: var(--card);
+  background: var(--surface);
   height: 32px;
   box-sizing: border-box;
 }
 
 .group-cell {
   font-weight: 600;
-  background: var(--card);
+  background: var(--surface);
 }
 
 .group-dot {
@@ -332,7 +269,7 @@ button.rail-cell:hover {
 }
 
 .task-cell {
-  color: var(--fg);
+  color: var(--ink);
 }
 
 .empty-hint {
@@ -423,7 +360,7 @@ button.rail-cell:hover {
   bottom: calc(100% + 6px);
   left: 50%;
   transform: translateX(-50%);
-  background: var(--fg);
+  background: var(--ink);
   color: var(--bg);
   font-size: 0.75rem;
   padding: 3px 8px;
@@ -451,9 +388,8 @@ button.rail-cell:hover .drag-grip {
 }
 
 .section-title {
-  font-size: 1rem;
-  margin: 1.6rem 0 0.6rem;
-  color: var(--muted);
+  font-size: 17px;
+  margin: 1.8rem 0 0.7rem;
 }
 
 /* Dependencies */
@@ -478,11 +414,11 @@ button.rail-cell:hover .drag-grip {
 .btn-active {
   background: var(--accent) !important;
   border-color: var(--accent) !important;
-  color: white !important;
+  color: var(--on-accent) !important;
 }
 
 .preds-field {
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.5rem 0.7rem;
   margin: 0;
@@ -500,7 +436,7 @@ button.rail-cell:hover .drag-grip {
   flex-direction: row !important;
   align-items: center;
   gap: 0.5rem !important;
-  color: var(--fg) !important;
+  color: var(--ink) !important;
   font-size: 0.9rem !important;
 }
 
@@ -514,7 +450,7 @@ button.rail-cell:hover .drag-grip {
   position: absolute;
   top: 0;
   width: 2px;
-  background: #e5484d;
+  background: var(--bad);
   z-index: 6;
   pointer-events: none;
 }
@@ -525,11 +461,11 @@ button.rail-cell:hover .drag-grip {
   top: 0;
   left: -4px;
   border: 5px solid transparent;
-  border-top-color: #e5484d;
+  border-top-color: var(--bad);
 }
 
 .task-bar-current {
-  box-shadow: 0 0 0 2px #e5484d;
+  box-shadow: 0 0 0 2px var(--bad);
   animation: pulse 2s ease-in-out infinite;
 }
 
@@ -554,7 +490,7 @@ button.rail-cell:hover .drag-grip {
 .btn-start {
   background: var(--accent) !important;
   border-color: var(--accent) !important;
-  color: white !important;
+  color: var(--on-accent) !important;
 }
 
 .live-status {
@@ -572,8 +508,8 @@ button.rail-cell:hover .drag-grip {
 }
 
 .live-notes {
-  background: var(--card);
-  border: 1px solid var(--border);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.7rem 0.9rem;
   margin: 0 0 0.8rem;
@@ -594,7 +530,7 @@ button.rail-cell:hover .drag-grip {
   bottom: 1.2rem;
   left: 50%;
   transform: translateX(-50%);
-  background: var(--fg);
+  background: var(--ink);
   color: var(--bg);
   padding: 0.6rem 1.1rem;
   border-radius: 10px;
@@ -629,7 +565,7 @@ button.rail-cell:hover .drag-grip {
 
 .modal-card {
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 12px;
   width: 100%;
   max-width: 420px;
@@ -676,9 +612,9 @@ button.rail-cell:hover .drag-grip {
 .editor-form select,
 .editor-form textarea {
   font: inherit;
-  color: var(--fg);
+  color: var(--ink);
   background: var(--bg);
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   border-radius: 8px;
   padding: 0.5rem 0.6rem;
 }
@@ -710,7 +646,7 @@ button.rail-cell:hover .drag-grip {
 }
 
 .swatch-selected {
-  border-color: var(--fg);
+  border-color: var(--ink);
   box-shadow: 0 0 0 2px var(--bg) inset;
 }
 
@@ -735,9 +671,9 @@ button.rail-cell:hover .drag-grip {
 }
 
 .editor-actions button {
-  border: 1px solid var(--border);
+  border: 1px solid var(--line);
   background: none;
-  color: var(--fg);
+  color: var(--ink);
   border-radius: 8px;
   padding: 0.5rem 1rem;
   min-height: 40px;
@@ -746,16 +682,62 @@ button.rail-cell:hover .drag-grip {
 .btn-primary {
   background: var(--accent) !important;
   border-color: var(--accent) !important;
-  color: white !important;
+  color: var(--on-accent) !important;
 }
 
 .btn-danger {
-  background: var(--danger) !important;
-  border-color: var(--danger) !important;
-  color: white !important;
+  background: var(--bad) !important;
+  border-color: var(--bad) !important;
+  color: var(--on-accent) !important;
 }
 
 .btn-danger-outline {
-  color: var(--danger) !important;
-  border-color: var(--danger) !important;
+  color: var(--bad) !important;
+  border-color: var(--bad) !important;
+}
+
+.start-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.start-option {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.2rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+}
+
+.start-option:hover {
+  border-color: var(--accent);
+}
+
+.start-option-title {
+  font-weight: 600;
+}
+
+.confirm-message {
+  margin: 0.2rem 0 1rem;
+}
+
+.small {
+  font-size: 14px;
+}
+
+/* Phones: the toolbar wraps (above); keep the zoom buttons together at the end */
+@media (max-width: 640px) {
+  .toolbar button {
+    padding: 0.4rem 0.7rem;
+  }
+  .plan-cards {
+    grid-template-columns: 1fr;
+  }
 }

@@ -1,5 +1,6 @@
-# Build stage: install everything and build the SPA
+# Build stage: install everything and build the SPA (the version is stamped into the page)
 FROM node:24-alpine AS build
+ARG VERSION=dev
 WORKDIR /app
 COPY package.json package-lock.json ./
 COPY shared/package.json shared/
@@ -7,15 +8,21 @@ COPY server/package.json server/
 COPY client/package.json client/
 RUN npm ci --ignore-scripts
 COPY . .
-RUN npm run build -w client
+RUN VITE_APP_VERSION="$VERSION" npm run build -w client
 
-# Runtime stage: prod deps only + built SPA + TS server (run via tsx)
+# Runtime stage: prod deps only + built SPA + TS server (run through tsx)
 FROM node:24-alpine
-WORKDIR /app
+ARG VERSION=dev
 ENV NODE_ENV=production \
-    PORT=3001 \
+    PORT=8000 \
     DB_PATH=/data/app.db \
-    CLIENT_DIST=/app/client/dist
+    CLIENT_DIST=/app/client/dist \
+    TZ=Europe/London \
+    APP_VERSION=$VERSION \
+    HOME=/tmp \
+    npm_config_cache=/tmp/.npm
+RUN apk add --no-cache tzdata
+WORKDIR /app
 COPY package.json package-lock.json ./
 COPY shared/package.json shared/
 COPY server/package.json server/
@@ -24,9 +31,15 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY shared/src shared/src
 COPY server/src server/src
 COPY --from=build /app/client/dist client/dist
-EXPOSE 3001
+# Runs as PUID 1003 / PGID 1006 on gomez (same as the media stack). Compose sets it via user:;
+# this default keeps the image non-root if run without compose.
+RUN mkdir -p /data && chown 1003:1006 /data
+USER 1003:1006
+VOLUME ["/data"]
+EXPOSE 8000
+LABEL org.opencontainers.image.title="Cooking Planner" org.opencontainers.image.version="$VERSION"
 # 127.0.0.1, not localhost: the server binds 0.0.0.0 (IPv4 only), but localhost
 # resolves ::1 first in the image, so wget would hit IPv6 and get refused.
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s \
-  CMD wget -qO- http://127.0.0.1:3001/api/health || exit 1
-CMD ["npx", "tsx", "server/src/index.ts"]
+HEALTHCHECK --interval=60s --timeout=5s --start-period=20s --retries=3 \
+  CMD wget -qO /dev/null http://127.0.0.1:8000/healthz || exit 1
+CMD ["node", "--import", "tsx", "server/src/index.ts"]

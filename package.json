@@ -1,7 +1,7 @@
 {
   "name": "cooking-planner",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.1.0",
   "workspaces": [
     "shared",
     "server",
@@ -10,8 +10,9 @@
   "scripts": {
     "dev": "concurrently -n server,client -c blue,green \"npm run dev -w server\" \"npm run dev -w client\"",
     "build": "npm run build -w client",
-    "test": "npm run test -w shared",
-    "start": "npm run start -w server"
+    "test": "npm run test --workspaces --if-present",
+    "start": "npm run start -w server",
+    "demo": "node scripts/demo-data.mjs"
   },
   "devDependencies": {
     "concurrently": "^9.1.0"

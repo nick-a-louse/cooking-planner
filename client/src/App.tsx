@@ -11,6 +11,7 @@ import {
   wouldCreateCycle,
 } from "@cookplan/shared";
 import PlanList from "./components/PlanList";
+import AppHeader from "./components/AppHeader";
 import TimelineCanvas from "./components/Timeline/TimelineCanvas";
 import TaskEditor from "./components/TaskEditor";
 import GroupEditor from "./components/GroupEditor";
@@ -22,7 +23,7 @@ import { chime } from "./utils/chime";
 import { usePlanStore } from "./state/planStore";
 
 export default function App() {
-  const { doc, closePlan, saveState, updateDoc, saveAsTemplate } = usePlanStore();
+  const { doc, closePlan, saveState, lastSavedAt, error, updateDoc, saveAsTemplate } = usePlanStore();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
@@ -45,6 +46,12 @@ export default function App() {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
+
+  // The plan (timeline) screen is full width, an agreed exception to the 1200px column; the list isn't.
+  const planOpen = !!doc;
+  useEffect(() => {
+    document.body.classList.toggle("g-wide", planOpen);
+  }, [planOpen]);
 
   // Live reminders: chime + toast when a pending task starts within ~2 minutes.
   useEffect(() => {
@@ -200,7 +207,7 @@ export default function App() {
 
   const endRun = () => {
     updateDoc((d) => ({ ...d, plan: { ...d.plan, status: "done" } }));
-    showToast("Run finished 🎉");
+    showToast("Run finished");
   };
 
   const resetRun = () => {
@@ -230,7 +237,7 @@ export default function App() {
     }));
     setLiveTaskId(null);
     const remaining = doc.tasks.filter((t) => t.id !== task.id && t.status !== "done").length;
-    showToast(remaining === 0 ? `All tasks done 🎉` : `"${task.name}" done`);
+    showToast(remaining === 0 ? "All tasks done" : `"${task.name}" done`);
   };
 
   const handleTaskClick = (task: Task) => {
@@ -287,18 +294,20 @@ export default function App() {
 
   return (
     <div className="plan-view">
-      <header className="plan-header">
-        <button onClick={closePlan}>← Plans</button>
-        <h2>{doc.plan.name}</h2>
-        <button className="anchor-chip" onClick={() => setSettingsOpen(true)} title="Plan settings">
+      <AppHeader
+        title={doc.plan.name}
+        updatedIso={lastSavedAt ?? ""}
+        updatedError={saveState === "error" ? error ?? "The last save didn't reach the server" : null}
+      >
+        <button className="btn btn-small" onClick={closePlan}>
+          <BackIcon /> Plans
+        </button>
+        <button className="btn btn-small" onClick={() => setSettingsOpen(true)} title="Plan settings">
           {doc.plan.mode === "backward" ? "Finish" : "Start"} {doc.plan.anchorTime.slice(11, 16)}
         </button>
-        <span className={`save-state save-${saveState}`}>
-          {saveState === "saving" ? "Saving…" : saveState === "error" ? "Save failed" : "Saved"}
-        </span>
-      </header>
+      </AppHeader>
 
-      <div className="toolbar">
+      <div className="wrap toolbar">
         {doc.plan.status === "draft" && (
           <>
             <button onClick={() => addTask()}>+ Task</button>
@@ -312,11 +321,11 @@ export default function App() {
                 if (!linking) showToast("Link mode: tap the task that comes first");
               }}
             >
-              🔗 Link
+              Link
             </button>
             {doc.tasks.length > 0 && (
               <button className="btn-start" onClick={() => setStartDialogOpen(true)}>
-                ▶ Start
+                Start cooking
               </button>
             )}
           </>
@@ -349,6 +358,7 @@ export default function App() {
         </button>
       </div>
 
+      <div className="wrap timeline-wrap">
       <TimelineCanvas
         doc={doc}
         zoomIdx={zoomIdx}
@@ -364,6 +374,7 @@ export default function App() {
         onReorder={reorderTasks}
         onLockedDragAttempt={handleLockedDragAttempt}
       />
+      </div>
 
       {editingTask && (
         <TaskEditor
@@ -413,5 +424,13 @@ export default function App() {
 
       {toast && <div className="toast">{toast}</div>}
     </div>
+  );
+}
+
+function BackIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M15 6l-6 6 6 6" />
+    </svg>
   );
 }

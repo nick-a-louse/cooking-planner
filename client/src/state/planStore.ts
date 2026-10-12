@@ -15,6 +15,8 @@ interface PlanState {
   doc: PlanDoc | null;
   docLoading: boolean;
   saveState: "saved" | "saving" | "error";
+  /** When the open plan was last saved successfully (ISO, UTC). Drives the header's Updated line. */
+  lastSavedAt: string | null;
   error: string | null;
 
   loadPlans: () => Promise<void>;
@@ -34,10 +36,11 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 
 export const usePlanStore = create<PlanState>((set, get) => ({
   plans: [],
-  plansLoading: false,
+  plansLoading: true, // until the first load finishes, so the header says "Loading…"
   doc: null,
   docLoading: false,
   saveState: "saved",
+  lastSavedAt: null,
   error: null,
 
   loadPlans: async () => {
@@ -52,7 +55,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   createPlan: async (name) => {
     try {
       const doc = await api.createPlan(name);
-      set({ doc });
+      set({ doc, saveState: "saved", lastSavedAt: doc.plan.updatedAt });
       await get().loadPlans();
     } catch (e) {
       set({ error: (e as Error).message });
@@ -72,7 +75,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   openPlan: async (id) => {
     set({ docLoading: true, error: null });
     try {
-      set({ doc: normalize(await api.getPlan(id)), docLoading: false, saveState: "saved" });
+      const doc = await api.getPlan(id);
+      set({ doc: normalize(doc), docLoading: false, saveState: "saved", lastSavedAt: doc.plan.updatedAt });
     } catch (e) {
       set({ error: (e as Error).message, docLoading: false });
     }
@@ -101,7 +105,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   useTemplate: async (templateId, name, anchorTime) => {
     try {
       const cloned = await api.clonePlan(templateId, { name, anchorTime });
-      set({ doc: normalize(cloned), saveState: "saved" });
+      set({ doc: normalize(cloned), saveState: "saved", lastSavedAt: cloned.plan.updatedAt });
       await get().loadPlans();
     } catch (e) {
       set({ error: (e as Error).message });
@@ -119,8 +123,8 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       const latest = get().doc;
       if (!latest) return;
       try {
-        await api.savePlan(latest);
-        set({ saveState: "saved" });
+        const saved = await api.savePlan(latest);
+        set({ saveState: "saved", lastSavedAt: saved.plan.updatedAt, error: null });
       } catch (e) {
         set({ saveState: "error", error: (e as Error).message });
       }
