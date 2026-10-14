@@ -1,4 +1,4 @@
-# What runs on gomez, in /srv/cooking-planner (alongside .env). The image is built by GitHub Actions.
+# What runs on the server, in /srv/cooking-planner (alongside .env). The image is built by GitHub Actions.
 services:
   cooking-planner:
     image: ghcr.io/nick-a-louse/cooking-planner:latest
@@ -7,7 +7,7 @@ services:
     user: "${PUID:-1003}:${PGID:-1006}"   # PUID/PGID live in .env, like the linuxserver containers
     env_file: .env
     ports:
-      - "3005:8000"          # registered in Obsidian: App standard → Port register
+      - "3005:8000"  # host port: change if it clashes
     volumes:
       - /opt/appdata/cooking-planner:/data   # SQLite: app.db + app.db-wal + app.db-shm
     logging:

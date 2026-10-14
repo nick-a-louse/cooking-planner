@@ -5,7 +5,7 @@ export default function AppFooter() {
     <footer className="g-footer">
       <div className="wrap">
         <span>Cooking Planner · v{VERSION}</span>
-        <span>Runs on gomez</span>
+        <span>Self-hosted</span>
       </div>
     </footer>
   );

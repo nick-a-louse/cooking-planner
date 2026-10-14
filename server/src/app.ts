@@ -19,7 +19,7 @@ function stats() {
 }
 
 export async function buildApp(opts: { clientDist?: string } = {}): Promise<FastifyInstance> {
-  // One log line per event, not per request (gomez app standard).
+  // One log line per event, not per request (my app standard).
   const app = Fastify({
     logger: { level: process.env.LOG_LEVEL ?? "info" },
     logController: new LogController({ disableRequestLogging: true }),

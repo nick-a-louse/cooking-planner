@@ -7,3 +7,7 @@ dist/
 data/
 .env
 .DS_Store
+
+# local tool settings
+.claude/
+.vscode/

@@ -31,7 +31,7 @@ RUN npm ci --omit=dev --ignore-scripts && npm cache clean --force
 COPY shared/src shared/src
 COPY server/src server/src
 COPY --from=build /app/client/dist client/dist
-# Runs as PUID 1003 / PGID 1006 on gomez (same as the media stack). Compose sets it via user:;
+# Runs as PUID 1003 / PGID 1006 on my server (same as the media stack). Compose sets it via user:;
 # this default keeps the image non-root if run without compose.
 RUN mkdir -p /data && chown 1003:1006 /data
 USER 1003:1006

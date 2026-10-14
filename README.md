@@ -1,14 +1,14 @@
 # Cooking Planner
 
-A Gantt-style planner for timing big meals, such as Christmas dinner. Lay out each dish as tasks on a shared timeline, link the ones that depend on each other, plan forwards from a start time or backwards from when food should be on the table, then follow the plan live on cooking day. Self-hosted on gomez for the family.
+A Gantt-style planner for timing big meals, such as Christmas dinner. Lay out each dish as tasks on a shared timeline, link the ones that depend on each other, plan forwards from a start time or backwards from when food should be on the table, then follow the plan live on cooking day. Runs self-hosted in Docker.
 
 ## Why
 
-Big meals need several dishes, each with several steps, to finish at the same moment. A timeline with dependencies (like a project plan) makes the timing visible and does the arithmetic when something runs late. Requirements and history: Obsidian *Efforts/4 - Projects/Cooking Planning App* (TECH-P6). It follows the shared app standard: *Atlas/Technology/Server/App standard*.
+Big meals need several dishes, each with several steps, to finish at the same moment. A timeline with dependencies (like a project plan) makes the timing visible and does the arithmetic when something runs late. It follows my shared app standard (see [How this was built](#how-this-was-built)).
 
-## Set up on gomez
+## Set up (Docker)
 
-1. Make the folders, owned by the gomez container user (1003:1006):
+1. Make the folders, owned by the container user (1003:1006):
    ```bash
    sudo mkdir -p /srv/cooking-planner /opt/appdata/cooking-planner
    sudo chown -R 1003:1006 /opt/appdata/cooking-planner
@@ -19,7 +19,7 @@ Big meals need several dishes, each with several steps, to finish at the same mo
    cd /srv/cooking-planner
    sudo install -m 600 /dev/null .env   # then fill it in from .env.example
    ```
-4. Start it (gomez is already logged in to ghcr.io as root):
+4. Start it :
    ```bash
    sudo docker compose pull && sudo docker compose up -d
    sudo docker compose ps     # shows "healthy" after about 20 seconds
@@ -35,8 +35,7 @@ The database schema updates itself on start-up, and the data lives outside the c
 
 ### Access
 
-- LAN: http://your-server:3005
-- Tailscale: http://gomez:3005
+- http://your-server:3005 (on your LAN, or over a VPN such as Tailscale)
 
 No login. It's reachable only on the LAN and over Tailscale, not from the internet.
 
@@ -56,7 +55,7 @@ Set in `.env` (see `.env.example`):
 
 | Setting | Default | What it does |
 |---|---|---|
-| `PUID` / `PGID` | `1003` / `1006` | User and group the container runs as (gomez's media user) |
+| `PUID` / `PGID` | `1003` / `1006` | User and group the container runs as (a non-root user on the host) |
 | `TZ` | `Europe/London` | Time zone for log times |
 | `LOG_LEVEL` | `info` | `debug`, `info`, `warn` or `error` |
 
@@ -96,7 +95,7 @@ Pushing to `master` runs the tests and publishes `ghcr.io/nick-a-louse/cooking-p
 ```
 .github/workflows/build.yml   CI: test → build → push to ghcr.io
 Dockerfile                    two-stage image: builds the client, runs the server as 1003:1006
-docker-compose.yml            what runs on gomez (/srv/cooking-planner)
+docker-compose.yml            what runs on the server (/srv/cooking-planner)
 .env.example                  every setting, commented
 client/                       React + Vite front end
 client/public/static/         gomez-ui.css/js (shared look), fonts, icon.svg + generated icons, manifest
@@ -105,3 +104,17 @@ shared/                       types, scheduling engine (reflow, cycles, live mod
 scripts/demo-data.mjs         fills a running app with made-up plans
 scripts/make_icons.py         builds the favicon set from icon.svg
 ```
+
+## How this was built
+
+This is one of several self-hosted apps I run at home. The code was written by Claude (an AI coding agent) under my direction. My part was the requirements, the standards, the review and the decisions:
+
+- **Requirements first.** Functional and non-functional requirements were agreed as tickets in Obsidian before any code was written.
+- **One shared standard.** All my apps share one look, one repo layout and one build-and-deploy pipeline (GitHub Actions → GitHub Container Registry → Docker Compose). `gomez-ui.css` and `gomez-ui.js` are the shared UI kit from that standard; gomez is my home server's name.
+- **Reviewed before merging.** Every change came in as a pull request, with screenshots at desktop and phone widths in light and dark mode, and was merged only after I'd reviewed it and the tests passed.
+
+More on how I work this way: [my GitHub profile](https://github.com/nick-a-louse).
+
+## Licence
+
+[MIT](LICENSE). Fonts are Barlow and Barlow Condensed under the SIL Open Font License (see the `OFL.txt` next to them).
