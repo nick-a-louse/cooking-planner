@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import type { Group, Plan, Task } from "@cookplan/shared";
 import {
   clashingTaskIds,
+  criticalTaskIds,
   currentTaskIds,
   equipmentClashes,
   formatHM,
@@ -116,6 +117,13 @@ export default function App() {
     [doc],
   );
   const clashIds = useMemo(() => clashingTaskIds(clashes), [clashes]);
+
+  // Critical path: off by default; outlines the chain that decides when the meal is ready.
+  const [showCritical, setShowCritical] = useState(false);
+  const criticalIds = useMemo(
+    () => (showCritical && doc ? criticalTaskIds(doc.tasks, doc.deps) : null),
+    [showCritical, doc],
+  );
 
   if (!doc) return <PlanList />;
 
@@ -419,6 +427,14 @@ export default function App() {
         {!isLive && <span className="spacer" />}
         {!kitchen && (
           <>
+            <button
+              onClick={() => setShowCritical(!showCritical)}
+              aria-pressed={showCritical}
+              className={showCritical ? "btn-active" : ""}
+              title="Outline the tasks that decide when the meal is ready; a delay to any of them makes it later"
+            >
+              Critical path
+            </button>
             <button onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))} disabled={zoomIdx === 0} aria-label="Zoom out">
               −
             </button>
@@ -465,7 +481,12 @@ export default function App() {
         onTaskTimeChange={changeTaskTime}
         onReorder={reorderTasks}
         onLockedDragAttempt={handleLockedDragAttempt}
-        barClass={(t) => (clashIds.has(t.id) ? "task-bar-clash" : "")}
+        barClass={(t) =>
+          [
+            clashIds.has(t.id) ? "task-bar-clash" : "",
+            criticalIds ? (criticalIds.has(t.id) ? "task-bar-critical" : "task-bar-dim") : "",
+          ].join(" ")
+        }
       />
       </div>
 

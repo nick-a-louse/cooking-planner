@@ -1065,3 +1065,11 @@ button.rail-cell:hover .drag-grip {
 .link-button:hover {
   text-decoration-color: currentColor;
 }
+
+/* Critical path (toggle): the deciding chain stands out, everything else steps back */
+.task-bar-critical {
+  box-shadow: 0 0 0 3px var(--surface), 0 0 0 5px var(--ink);
+}
+.task-bar-dim {
+  opacity: 0.3;
+}
