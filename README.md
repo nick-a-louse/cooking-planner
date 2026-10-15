@@ -1,8 +1,20 @@
 # Cooking Planner
 
-![A Christmas dinner plan: dishes as coloured bars on a timeline, with arrows for the steps that depend on each other](docs/screenshot.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/desktop-dark.png">
+  <img alt="A Christmas dinner plan: dishes as coloured bars on a timeline, with arrows for the steps that depend on each other and a warning about an oven clash" src="docs/screenshots/desktop-light.png">
+</picture>
 
 A Gantt-style planner for timing big meals, such as Christmas dinner. Lay out each dish as tasks on a shared timeline, link the ones that depend on each other, plan forwards from a start time or backwards from when food should be on the table, then follow the plan live on cooking day. Runs self-hosted in Docker.
+
+## On a phone
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshots/phone-dark.png">
+  <img alt="The same plan on a phone" src="docs/screenshots/phone-light.png" width="300">
+</picture>
+
+The screenshots show the demo plans from `npm run demo`. They follow your GitHub theme, light or dark, like the app itself.
 
 ## Why
 
@@ -153,7 +165,7 @@ Pushing to `master` runs the tests and publishes `ghcr.io/nick-a-louse/cooking-p
 
 ```
 .github/workflows/build.yml   CI: test → build → push to ghcr.io
-docs/screenshot.png           the picture at the top of this README
+docs/screenshots/             the pictures in this README (light and dark, desktop and phone)
 Dockerfile                    two-stage image: builds the client, runs the server as 1003:1006
 docker-compose.yml            what runs on the server (/srv/cooking-planner)
 .env.example                  every setting, commented
