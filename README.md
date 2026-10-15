@@ -4,6 +4,32 @@
 
 A Gantt-style planner for timing big meals, such as Christmas dinner. Lay out each dish as tasks on a shared timeline, link the ones that depend on each other, plan forwards from a start time or backwards from when food should be on the table, then follow the plan live on cooking day. Runs self-hosted in Docker.
 
+## Screenshots
+
+**Plans and templates**, with My kitchen, export and import:
+
+![The plan list: two plans and a template, each with export and delete buttons, plus import and export-all](docs/plan-list.png)
+
+**Editing a task**: timing, what equipment it uses, what it starts after, and whether it needs someone's hands:
+
+<img src="docs/task-editor.png" alt="The task editor for Roast potatoes: group, oven and temperature, start and duration, the tasks it starts after, and a hands-off tick box" width="420">
+
+**Critical path** (dark mode): the chain of tasks that decides when dinner is ready:
+
+![The Christmas dinner timeline in dark mode with the turkey chain outlined and the other tasks dimmed](docs/critical-path-dark.png)
+
+**Kitchen view** during a live run: what to do now, with time left, and what's next:
+
+![The kitchen view in dark mode: Roast turkey with a large countdown and a Done button, and the next four tasks with countdowns](docs/kitchen-view-dark.png)
+
+**On a phone**: an alarm ringing until silenced (left), and the kitchen view (right):
+
+<img src="docs/phones.png" alt="Two phone screens: a red Silence button over a Start now alert, and the kitchen view in dark mode" width="560">
+
+**Printout**: the whole timeline on one page, then a timed checklist:
+
+<img src="docs/print.png" alt="Two printed A4 pages: the Christmas dinner timeline, and a checklist with tick boxes, times, dishes and notes" width="640">
+
 ## Why
 
 Big meals need several dishes, each with several steps, to finish at the same moment. A timeline with dependencies (like a project plan) makes the timing visible and does the arithmetic when something runs late. It follows my shared app standard (see [How this was built](#how-this-was-built)).
@@ -153,7 +179,7 @@ Pushing to `master` runs the tests and publishes `ghcr.io/nick-a-louse/cooking-p
 
 ```
 .github/workflows/build.yml   CI: test → build → push to ghcr.io
-docs/screenshot.png           the picture at the top of this README
+docs/                         screenshots for this README
 Dockerfile                    two-stage image: builds the client, runs the server as 1003:1006
 docker-compose.yml            what runs on the server (/srv/cooking-planner)
 .env.example                  every setting, commented
