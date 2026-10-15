@@ -516,6 +516,12 @@ button.rail-cell:hover .drag-grip {
   white-space: pre-wrap;
 }
 
+/* Same space above the buttons as in the editing dialogs: there the form's 0.7rem gap and the
+   buttons' 0.4rem margin add up; here plain margins would overlap, so use the total. */
+.live-hint {
+  margin: 0 0 1.1rem;
+}
+
 .shift-confirm p {
   margin: 0.4rem 0;
 }

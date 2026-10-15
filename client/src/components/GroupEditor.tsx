@@ -32,6 +32,7 @@ export default function GroupEditor({ group, onSave, onDelete, onClose }: Props)
           <span className="swatch-label">Colour</span>
           <SwatchPicker value={color} onChange={setColor} />
         </div>
+        <p className="muted small">Deleting a group keeps its tasks (they become ungrouped).</p>
         <div className="editor-actions">
           {confirmingDelete ? (
             <button type="button" className="btn-danger" onClick={() => onDelete(group.id)}>
@@ -51,7 +52,6 @@ export default function GroupEditor({ group, onSave, onDelete, onClose }: Props)
           </button>
         </div>
       </form>
-      <p className="muted small">Deleting a group keeps its tasks (they become ungrouped).</p>
     </Modal>
   );
 }

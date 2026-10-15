@@ -47,7 +47,7 @@ export default function LiveTaskPanel({ doc, task, liveZeroAt, onComplete, onClo
         {formatHM(start)} – {formatHM(end)} · {formatDuration(task.durationMin)}
       </p>
       {task.notes && <p className="live-notes">{task.notes}</p>}
-      <p className="muted small">
+      <p className="muted small live-hint">
         {doc.plan.status === "done"
           ? "This run has finished, so the plan is locked. Press Edit plan again on the toolbar to change it."
           : "The plan is running, so it can't be edited. To change it, press End run, then Edit plan again."}
