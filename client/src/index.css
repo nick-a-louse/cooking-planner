@@ -741,3 +741,96 @@ button.rail-cell:hover .drag-grip {
     grid-template-columns: 1fr;
   }
 }
+
+/* Settings field that isn't a single input (e.g. a segmented control) */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+.field .seg {
+  align-self: flex-start;
+}
+
+/* Live alerts: banners across the top of the screen until dismissed */
+.live-alerts {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 32px));
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 90;
+  max-height: calc(100vh - 24px);
+  overflow-y: auto;
+}
+.live-alert {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-left: 8px solid var(--faint);
+  border-radius: var(--radius);
+  padding: 10px 8px 10px 14px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.live-alert-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1;
+}
+.live-alert-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.live-alert-start .live-alert-label,
+.live-alert-end .live-alert-label,
+.live-alert-waitEnd .live-alert-label {
+  color: var(--warn);
+}
+.live-alert-task {
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.live-alert-detail {
+  font-size: 14px;
+  color: var(--muted);
+}
+.live-alert-close {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: 16px;
+  cursor: pointer;
+}
+.live-alerts-clear {
+  align-self: center;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 4px 12px rgb(0 0 0 / 0.15);
+  cursor: pointer;
+}
+.toolbar button[aria-pressed="true"] {
+  color: var(--muted);
+}

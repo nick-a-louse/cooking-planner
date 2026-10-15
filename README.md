@@ -109,6 +109,13 @@ Set by the image (no need to change): `PORT=8000`, `DB_PATH=/data/app.db`, `CLIE
 
 The header's "Updated" line shows the last successful save. It turns red only if a save fails, never just because time has passed.
 
+## On cooking day
+
+Press **Start cooking** and the plan runs against the clock:
+
+- **The screen stays on** while the run is live, so a phone propped up in the kitchen doesn't lock. Over HTTPS this uses the browser's [Screen Wake Lock API](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API); over plain HTTP (a home network) it loops a tiny silent video instead.
+- **Alerts** (a chime and a banner that stays until dismissed) when a task is coming up, should start now, should be finished, or a wait is over. Set the warning time (1, 2, 5 or 10 minutes) in plan settings. **Sound on/off** is remembered per device. Alerts work while the app is open on screen; there are no push notifications.
+
 ## Live sync
 
 Every device with a plan open sees changes from the others straight away, whether you're planning or cooking. Each open plan keeps a [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream to `GET /api/plans/:id/events`, and every save is pushed to all of them.

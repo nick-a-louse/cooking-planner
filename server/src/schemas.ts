@@ -25,6 +25,7 @@ const plan = {
     liveStartedAt: isoOrNull,
     // Optional here so an out-of-date page gets a clear "reload" message rather than a schema error.
     revision: { type: "integer", minimum: 1 },
+    alertLeadMin: { enum: [1, 2, 5, 10] },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },

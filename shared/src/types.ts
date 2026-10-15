@@ -13,6 +13,8 @@ export interface Plan {
   liveStartedAt: string | null;
   /** Goes up by one on every save. A save must quote the revision it was based on (live sync). */
   revision: number;
+  /** Minutes of warning before a task starts during a live run (1, 2, 5 or 10). */
+  alertLeadMin: number;
   createdAt: string;
   updatedAt: string;
 }

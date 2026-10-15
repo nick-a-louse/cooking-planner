@@ -78,6 +78,7 @@ function addColumn(sql: string): void {
 }
 addColumn("ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'"); // wait tasks
 addColumn("ALTER TABLE plans ADD COLUMN revision INTEGER NOT NULL DEFAULT 1"); // live sync
+addColumn("ALTER TABLE plans ADD COLUMN alert_lead_min INTEGER NOT NULL DEFAULT 5"); // live alerts
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tasks_plan ON tasks(plan_id);

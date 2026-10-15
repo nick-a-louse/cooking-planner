@@ -76,6 +76,7 @@ function rowToPlan(r: any): Plan {
     status: r.status,
     liveStartedAt: r.live_started_at,
     revision: r.revision,
+    alertLeadMin: r.alert_lead_min,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -119,6 +120,14 @@ function loadDoc(planId: string): PlanDoc | null {
     .all(planId)
     .map((r: any) => ({ planId: r.plan_id, predecessorId: r.predecessor_id, successorId: r.successor_id }));
   return { plan: rowToPlan(planRow), groups, tasks, deps };
+}
+
+/** Per-plan settings that a copy or a plan made from a template keeps. */
+const SETTINGS_COLUMNS = ["alert_lead_min"];
+
+function copyPlanSettings(fromId: string, toId: string): void {
+  const set = SETTINGS_COLUMNS.map((c) => `${c} = (SELECT ${c} FROM plans WHERE id = @fromId)`).join(", ");
+  db.prepare(`UPDATE plans SET ${set} WHERE id = @toId`).run({ fromId, toId });
 }
 
 const insertGroup = () =>
@@ -208,7 +217,8 @@ export function planRoutes(app: FastifyInstance): void {
         const d = doc;
         db.prepare(
           `UPDATE plans SET name=@name, mode=@mode, anchor_time=@anchorTime, is_template=@isTemplate,
-           status=@status, live_started_at=@liveStartedAt, revision=revision + 1, updated_at=@updatedAt WHERE id=@id`,
+           status=@status, live_started_at=@liveStartedAt, revision=revision + 1, updated_at=@updatedAt,
+           alert_lead_min=COALESCE(@alertLeadMin, alert_lead_min) WHERE id=@id`,
         ).run({
           id: planId,
           name: d.plan.name,
@@ -218,6 +228,7 @@ export function planRoutes(app: FastifyInstance): void {
           status: d.plan.status,
           liveStartedAt: d.plan.liveStartedAt,
           updatedAt: now(),
+          alertLeadMin: d.plan.alertLeadMin ?? null,
         });
         db.prepare("DELETE FROM deps WHERE plan_id = ?").run(planId);
         db.prepare("DELETE FROM tasks WHERE plan_id = ?").run(planId);
@@ -283,6 +294,7 @@ export function planRoutes(app: FastifyInstance): void {
           ts,
           ts,
         );
+        copyPlanSettings(src.plan.id, newPlanId);
         const gStmt = insertGroup();
         const tStmt = insertTask();
         const dStmt = insertDep();
