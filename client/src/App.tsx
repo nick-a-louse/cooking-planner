@@ -29,7 +29,8 @@ import { useMuted } from "./hooks/useMuted";
 import { hasUnsavedChanges, usePlanStore } from "./state/planStore";
 
 export default function App() {
-  const { doc, closePlan, saveState, lastSavedAt, error, notice, clearNotice, updateDoc, saveAsTemplate } = usePlanStore();
+  const { doc, closePlan, saveState, lastSavedAt, error, notice, clearNotice, updateDoc, saveAsTemplate, history, undo, redo } =
+    usePlanStore();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
@@ -69,6 +70,25 @@ export default function App() {
     if (toastTimer.current) clearTimeout(toastTimer.current);
     toastTimer.current = setTimeout(() => setToast(null), 8000);
   }, [notice, doc, clearNotice]);
+
+  // Undo / redo shortcuts while planning: Ctrl+Z, Ctrl+Shift+Z or Ctrl+Y (Cmd on a Mac).
+  // Left alone while typing in a box or with a dialog open, where they mean something else.
+  const isDraft = doc?.plan.status === "draft";
+  useEffect(() => {
+    if (!isDraft) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (!(e.ctrlKey || e.metaKey) || e.altKey) return;
+      const t = e.target as HTMLElement | null;
+      if (t?.closest("input, textarea, select, [contenteditable='true']") || document.querySelector(".modal-overlay")) return;
+      const key = e.key.toLowerCase();
+      if (key === "z" && !e.shiftKey) undo();
+      else if ((key === "z" && e.shiftKey) || key === "y") redo();
+      else return;
+      e.preventDefault();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [isDraft, undo, redo]);
 
   // Closing or reloading the tab with an edit not yet saved: let the browser ask "Leave site?".
   useEffect(() => {
@@ -332,6 +352,12 @@ export default function App() {
             <button onClick={() => addTask()}>+ Task</button>
             <button onClick={() => addTask("wait")}>+ Wait</button>
             <button onClick={addGroup}>+ Group</button>
+            <button onClick={undo} disabled={history.past.length === 0} title="Undo (Ctrl+Z)" aria-label="Undo">
+              <UndoIcon />
+            </button>
+            <button onClick={redo} disabled={history.future.length === 0} title="Redo (Ctrl+Shift+Z)" aria-label="Redo">
+              <UndoIcon redo />
+            </button>
             <button
               className={linking ? "btn-active" : ""}
               onClick={() => {
@@ -492,6 +518,26 @@ function BackIcon() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
       <path d="M15 6l-6 6 6 6" />
+    </svg>
+  );
+}
+
+function UndoIcon({ redo = false }: { redo?: boolean }) {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      width="18"
+      height="18"
+      aria-hidden="true"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      style={redo ? { transform: "scaleX(-1)" } : undefined}
+    >
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
     </svg>
   );
 }
