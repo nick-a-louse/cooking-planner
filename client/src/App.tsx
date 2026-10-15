@@ -242,21 +242,27 @@ export default function App() {
     }));
   };
 
-  const reorderTasks = (orderedIds: string[], movedId: string) => {
+  // Reorder within a group. The task stays in its group: moving between groups is moveTaskToGroup.
+  // (Taking the group from the row above used to drop a task moved to the top of its group into the group above.)
+  const reorderTasks = (orderedIds: string[], _movedId: string) => {
+    if (doc.plan.status !== "draft") return;
     updateDoc((d) => {
       const byId = new Map(d.tasks.map((t) => [t.id, t]));
-      const movedIdx = orderedIds.indexOf(movedId);
-      const neighbourId = movedIdx > 0 ? orderedIds[movedIdx - 1] : orderedIds[movedIdx + 1];
-      const newGroupId = neighbourId ? (byId.get(neighbourId)?.groupId ?? null) : null;
-      return {
-        ...d,
-        tasks: orderedIds.map((id, i) => {
-          const t = byId.get(id)!;
-          const groupId = id === movedId ? newGroupId : t.groupId;
-          return { ...t, groupId, sortOrder: i };
-        }),
-      };
+      return { ...d, tasks: orderedIds.map((id, i) => ({ ...byId.get(id)!, sortOrder: i })) };
     });
+  };
+
+  // Dropped on another group: it joins at the bottom, and every task already there stays put.
+  const moveTaskToGroup = (taskId: string, groupId: string | null) => {
+    if (doc.plan.status !== "draft") return;
+    const task = doc.tasks.find((t) => t.id === taskId);
+    if (!task || task.groupId === groupId) return;
+    updateDoc((d) => {
+      const last = d.tasks.reduce((m, t) => Math.max(m, t.sortOrder), 0);
+      return { ...d, tasks: d.tasks.map((t) => (t.id === taskId ? { ...t, groupId, sortOrder: last + 1 } : t)) };
+    });
+    const name = groupId ? doc.groups.find((g) => g.id === groupId)?.name : "Ungrouped";
+    showToast(`Moved "${task.name}" to ${name}`);
   };
 
   const startRun = (liveZeroAtIso: string) => {
@@ -497,6 +503,7 @@ export default function App() {
         onEditGroup={(g) => setEditingGroupId(g.id)}
         onTaskTimeChange={changeTaskTime}
         onReorder={reorderTasks}
+        onMoveToGroup={moveTaskToGroup}
         onLockedDragAttempt={handleLockedDragAttempt}
         barClass={(t) =>
           [
