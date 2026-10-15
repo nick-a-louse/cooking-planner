@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import type { PlanDoc, PlanSummary } from "@cookplan/shared";
 import { reflow, sanitizeDeps } from "@cookplan/shared";
-import { api } from "../api/client";
+import { api, ApiError } from "../api/client";
 
 /** Enforce engine invariants: valid acyclic deps, dependent starts derived. */
 function normalize(doc: PlanDoc): PlanDoc {
@@ -18,6 +18,8 @@ interface PlanState {
   /** When the open plan was last saved successfully (ISO, UTC). Drives the header's Updated line. */
   lastSavedAt: string | null;
   error: string | null;
+  /** A one-off message about something that happened elsewhere, e.g. another device's change. */
+  notice: string | null;
 
   loadPlans: () => Promise<void>;
   createPlan: (name: string) => Promise<void>;
@@ -34,6 +36,7 @@ interface PlanState {
   saveAsTemplate: (name: string) => Promise<void>;
   /** Clone a template into a fresh plan with a new name/anchor and open it. */
   useTemplate: (templateId: string, name: string, anchorTime: string) => Promise<void>;
+  clearNotice: () => void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -48,6 +51,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   saveState: "saved",
   lastSavedAt: null,
   error: null,
+  notice: null,
 
   loadPlans: async () => {
     set({ plansLoading: true, error: null });
@@ -61,7 +65,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   createPlan: async (name) => {
     try {
       const doc = await api.createPlan(name);
-      set({ doc, saveState: "saved", lastSavedAt: doc.plan.updatedAt });
+      showDoc(doc);
       await get().loadPlans();
     } catch (e) {
       set({ error: (e as Error).message });
@@ -71,7 +75,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   deletePlan: async (id) => {
     try {
       await api.deletePlan(id);
-      if (get().doc?.plan.id === id) set({ doc: null });
+      if (get().doc?.plan.id === id) leavePlan();
       await get().loadPlans();
     } catch (e) {
       set({ error: (e as Error).message });
@@ -79,10 +83,9 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   },
 
   openPlan: async (id) => {
-    set({ docLoading: true, error: null });
+    set({ docLoading: true, error: null, notice: null });
     try {
-      const doc = await api.getPlan(id);
-      set({ doc: normalize(doc), docLoading: false, saveState: "saved", lastSavedAt: doc.plan.updatedAt });
+      showDoc(await api.getPlan(id));
     } catch (e) {
       set({ error: (e as Error).message, docLoading: false });
     }
@@ -101,7 +104,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       await saveNow(); // one more try: the server may be back
       if (get().saveState === "error") return false;
     }
-    set({ doc: null, saveState: "saved" });
+    leavePlan();
     void get().loadPlans();
     return true;
   },
@@ -119,8 +122,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
 
   useTemplate: async (templateId, name, anchorTime) => {
     try {
-      const cloned = await api.clonePlan(templateId, { name, anchorTime });
-      set({ doc: normalize(cloned), saveState: "saved", lastSavedAt: cloned.plan.updatedAt });
+      showDoc(await api.clonePlan(templateId, { name, anchorTime }));
       await get().loadPlans();
     } catch (e) {
       set({ error: (e as Error).message });
@@ -138,7 +140,29 @@ export const usePlanStore = create<PlanState>((set, get) => ({
       void saveNow();
     }, 750);
   },
+
+  clearNotice: () => set({ notice: null }),
 }));
+
+/** Show a plan freshly loaded from the server, and start listening for other devices' changes. */
+function showDoc(doc: PlanDoc): void {
+  usePlanStore.setState({
+    doc: normalize(doc),
+    docLoading: false,
+    saveState: "saved",
+    lastSavedAt: doc.plan.updatedAt,
+    error: null,
+  });
+  listen(doc.plan.id);
+}
+
+/** Back to the plan list: stop listening and forget any pending edit. */
+function leavePlan(): void {
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = null;
+  stopListening();
+  usePlanStore.setState({ doc: null, saveState: "saved" });
+}
 
 /** Save the open plan straight away (after any save already in flight). */
 async function saveNow(): Promise<void> {
@@ -148,14 +172,33 @@ async function saveNow(): Promise<void> {
   const run = (async () => {
     try {
       const saved = await api.savePlan(latest);
-      // Only mark it saved if nothing changed while the request was out.
-      if (!saveTimer && usePlanStore.getState().doc === latest) {
-        usePlanStore.setState({ saveState: "saved", lastSavedAt: saved.plan.updatedAt, error: null });
-      } else {
-        usePlanStore.setState({ lastSavedAt: saved.plan.updatedAt });
-      }
+      const current = usePlanStore.getState().doc;
+      if (!current || current.plan.id !== saved.plan.id) return;
+      const unchanged = !saveTimer && current === latest;
+      // Keep any edit made while the request was out; just move it onto the new revision.
+      usePlanStore.setState({
+        doc: { ...current, plan: { ...current.plan, revision: saved.plan.revision, updatedAt: saved.plan.updatedAt } },
+        lastSavedAt: saved.plan.updatedAt,
+        ...(unchanged ? { saveState: "saved" as const, error: null } : {}),
+      });
     } catch (e) {
-      usePlanStore.setState({ saveState: "error", error: (e as Error).message });
+      const body = e instanceof ApiError ? e.body : {};
+      if (e instanceof ApiError && e.status === 409 && body.doc) {
+        // Another device saved first. Their version wins; ours is dropped and the cook is told.
+        if (saveTimer) clearTimeout(saveTimer);
+        saveTimer = null;
+        pendingRemote = null;
+        const theirs = body.doc as PlanDoc;
+        usePlanStore.setState({
+          doc: normalize(theirs),
+          saveState: "saved",
+          lastSavedAt: theirs.plan.updatedAt,
+          error: null,
+          notice: "This plan was changed on another device at the same time, so your last change wasn't saved. You're now seeing the latest version.",
+        });
+      } else {
+        usePlanStore.setState({ saveState: "error", error: (e as Error).message });
+      }
     }
   })();
   inFlight = run;
@@ -164,9 +207,72 @@ async function saveNow(): Promise<void> {
   } finally {
     if (inFlight === run) inFlight = null;
   }
+  applyPendingRemote();
 }
 
 /** True while an edit hasn't reached the server yet (drives the "Leave site?" warning). */
 export function hasUnsavedChanges(): boolean {
   return saveTimer !== null || inFlight !== null || usePlanStore.getState().saveState === "error";
+}
+
+// ---------------------------------------------------------------- live sync
+
+let source: EventSource | null = null;
+let sourcePlanId: string | null = null;
+/** A newer copy from another device that arrived while one of our own edits was unsaved. */
+let pendingRemote: PlanDoc | null = null;
+
+function listen(planId: string): void {
+  if (source && sourcePlanId === planId) return;
+  stopListening();
+  sourcePlanId = planId;
+  if (typeof EventSource === "undefined") return; // very old browser: no live sync, saves still work
+  const es = new EventSource(api.planEventsUrl(planId));
+  source = es;
+  let dropped = false;
+  es.addEventListener("plan", (e) => receive(JSON.parse((e as MessageEvent).data) as PlanDoc));
+  es.addEventListener("deleted", () => {
+    if (usePlanStore.getState().doc?.plan.id !== planId) return;
+    leavePlan();
+    usePlanStore.setState({ notice: "This plan was deleted on another device." });
+    void usePlanStore.getState().loadPlans();
+  });
+  es.onerror = () => {
+    dropped = true; // the browser reconnects by itself
+  };
+  es.onopen = () => {
+    if (!dropped) return;
+    dropped = false;
+    // Back after a drop (server restart, Wi-Fi blip): catch up on anything missed meanwhile.
+    api
+      .getPlan(planId)
+      .then(receive)
+      .catch(() => {});
+  };
+}
+
+function stopListening(): void {
+  source?.close();
+  source = null;
+  sourcePlanId = null;
+  pendingRemote = null;
+}
+
+/** A copy of the plan from the server. Show it if it's newer than ours and we have nothing unsaved. */
+function receive(remote: PlanDoc): void {
+  const local = usePlanStore.getState().doc;
+  if (!local || local.plan.id !== remote.plan.id) return;
+  if (remote.plan.revision <= local.plan.revision) return; // our own save coming back, or old news
+  if (saveTimer || inFlight) {
+    pendingRemote = remote; // decide once our save has finished
+    return;
+  }
+  usePlanStore.setState({ doc: normalize(remote), lastSavedAt: remote.plan.updatedAt });
+}
+
+function applyPendingRemote(): void {
+  const remote = pendingRemote;
+  if (!remote || saveTimer || inFlight) return;
+  pendingRemote = null;
+  receive(remote);
 }

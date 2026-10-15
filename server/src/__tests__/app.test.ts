@@ -123,3 +123,69 @@ describe("default start time", () => {
     expect(defaultAnchor(new Date("2026-12-25T10:00:00Z"))).toBe("2026-12-25T18:00");
   });
 });
+
+describe("live sync", () => {
+  const newPlan = async (name: string) =>
+    (await app.inject({ method: "POST", url: "/api/plans", payload: { name } })).json();
+  const put = (doc: any) => app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: doc });
+
+  it("bumps the revision on each save and refuses a save based on an old one", async () => {
+    const doc = await newPlan("Two devices");
+    expect(doc.plan.revision).toBe(1);
+    const phone = structuredClone(doc);
+    const tablet = structuredClone(doc);
+
+    phone.plan.name = "Two devices (phone)";
+    const first = await put(phone);
+    expect(first.statusCode).toBe(200);
+    expect(first.json().plan.revision).toBe(2);
+
+    tablet.plan.name = "Two devices (tablet)";
+    const second = await put(tablet);
+    expect(second.statusCode).toBe(409);
+    expect(second.json().error).toMatch(/another device/);
+    expect(second.json().doc.plan).toMatchObject({ name: "Two devices (phone)", revision: 2 });
+  });
+
+  it("tells an out-of-date page to reload instead of overwriting", async () => {
+    const doc = await newPlan("Old page");
+    delete doc.plan.revision;
+    const r = await put(doc);
+    expect(r.statusCode).toBe(409);
+    expect(r.json().error).toMatch(/Reload/);
+  });
+
+  it("does not count a 409 as a failed save in the metrics", async () => {
+    const doc = await newPlan("Metrics conflict");
+    await put({ ...doc, plan: { ...doc.plan, revision: 99 } });
+    expect((await app.inject("/metrics")).body).toContain("cooking_planner_last_attempt_ok 1");
+  });
+
+  it("streams each save and the delete to every open screen", async () => {
+    const doc = await newPlan("Streamed");
+    const address = await app.listen({ port: 0, host: "127.0.0.1" });
+    const res = await fetch(`${address}/api/plans/${doc.plan.id}/events`);
+    expect(res.headers.get("content-type")).toContain("text/event-stream");
+    const reader = res.body!.getReader();
+    let text = "";
+    const readUntil = async (marker: string) => {
+      while (!text.includes(marker)) text += new TextDecoder().decode((await reader.read()).value);
+    };
+    await readUntil("retry:");
+
+    doc.plan.name = "Streamed (renamed)";
+    expect((await put(doc)).statusCode).toBe(200);
+    await readUntil("event: plan");
+    await readUntil("\n\n");
+    const data = JSON.parse(text.split("event: plan\ndata: ")[1].split("\n")[0]);
+    expect(data.plan).toMatchObject({ name: "Streamed (renamed)", revision: 2 });
+
+    await app.inject({ method: "DELETE", url: `/api/plans/${doc.plan.id}` });
+    await readUntil("event: deleted");
+    await reader.cancel();
+  });
+
+  it("returns 404 for the stream of a plan that doesn't exist", async () => {
+    expect((await app.inject("/api/plans/nope/events")).statusCode).toBe(404);
+  });
+});

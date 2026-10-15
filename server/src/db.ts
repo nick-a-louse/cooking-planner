@@ -68,12 +68,16 @@ db.exec(`
   CREATE INDEX IF NOT EXISTS idx_groups_plan ON groups(plan_id);
 `);
 
-// Additive migration for databases created before the wait-task feature.
-try {
-  db.exec("ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'");
-} catch {
-  // Column already exists.
+// Additive migrations for databases created before a feature existed.
+function addColumn(sql: string): void {
+  try {
+    db.exec(sql);
+  } catch {
+    // Column already exists.
+  }
 }
+addColumn("ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'"); // wait tasks
+addColumn("ALTER TABLE plans ADD COLUMN revision INTEGER NOT NULL DEFAULT 1"); // live sync
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tasks_plan ON tasks(plan_id);

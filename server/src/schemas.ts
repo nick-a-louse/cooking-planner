@@ -23,6 +23,8 @@ const plan = {
     isTemplate: { type: "boolean" },
     status: { enum: ["draft", "live", "done"] },
     liveStartedAt: isoOrNull,
+    // Optional here so an out-of-date page gets a clear "reload" message rather than a schema error.
+    revision: { type: "integer", minimum: 1 },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
