@@ -11,6 +11,8 @@ export interface Plan {
   isTemplate: boolean;
   status: PlanStatus;
   liveStartedAt: string | null;
+  /** Goes up by one on every save. A save must quote the revision it was based on (live sync). */
+  revision: number;
   createdAt: string;
   updatedAt: string;
 }

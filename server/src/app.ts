@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { displayVersion } from "@cookplan/shared";
 import { db } from "./db.js";
 import { planRoutes } from "./routes/plans.js";
+import { closeAllStreams, streamCount } from "./events.js";
 
 export const VERSION = displayVersion(process.env.APP_VERSION);
 
@@ -28,7 +29,8 @@ export async function buildApp(opts: { clientDist?: string } = {}): Promise<Fast
   // Count plan saves (the full-document PUT) for the metrics.
   app.addHook("onResponse", async (req, reply) => {
     if (req.method !== "PUT" || req.routeOptions.url !== "/api/plans/:id") return;
-    const ok = reply.statusCode < 400;
+    // 409 means "changed on another device" or "name taken": the app handles it, the save didn't fail.
+    const ok = reply.statusCode < 400 || reply.statusCode === 409;
     saves[ok ? "ok" : "error"] += 1;
     saves.lastOk = ok;
     if (!ok) req.log.warn({ status: reply.statusCode, url: req.url }, "plan save failed");
@@ -57,6 +59,8 @@ export async function buildApp(opts: { clientDist?: string } = {}): Promise<Fast
   });
 
   planRoutes(app);
+  // Open live-sync streams would otherwise hold the server open on shutdown.
+  app.addHook("preClose", async () => closeAllStreams());
 
   // Kept for anything still using the old path; /healthz is the standard one.
   app.get("/api/health", () => ({ ok: true }));
@@ -92,6 +96,9 @@ export async function buildApp(opts: { clientDist?: string } = {}): Promise<Fast
       "# TYPE cooking_planner_plans gauge",
       `cooking_planner_plans{kind="plan"} ${s.plans}`,
       `cooking_planner_plans{kind="template"} ${s.templates}`,
+      "# HELP cooking_planner_live_streams Plan screens currently connected for live sync.",
+      "# TYPE cooking_planner_live_streams gauge",
+      `cooking_planner_live_streams ${streamCount()}`,
     ];
     reply.type("text/plain; version=0.0.4").send(lines.join("\n") + "\n");
   });

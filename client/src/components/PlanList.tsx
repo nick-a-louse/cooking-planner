@@ -65,7 +65,7 @@ function UseTemplateDialog({
 }
 
 export default function PlanList() {
-  const { plans, plansLoading, error, loadPlans, createPlan, deletePlan, openPlan } = usePlanStore();
+  const { plans, plansLoading, error, notice, loadPlans, createPlan, deletePlan, openPlan } = usePlanStore();
   const [newName, setNewName] = useState("");
   const [usingTemplate, setUsingTemplate] = useState<PlanSummary | null>(null);
   const [deleting, setDeleting] = useState<PlanSummary | null>(null);
@@ -108,6 +108,7 @@ export default function PlanList() {
       {newNameTaken && <p className="error small">A plan with this name already exists.</p>}
 
       {error && <p className="error">{error}</p>}
+      {notice && <p className="notice">{notice}</p>}
       {!plansLoading && realPlans.length === 0 && (
         <p className="muted">No plans yet — create your first meal plan above.</p>
       )}

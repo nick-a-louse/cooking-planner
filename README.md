@@ -104,9 +104,16 @@ Set by the image (no need to change): `PORT=8000`, `DB_PATH=/data/app.db`, `CLIE
   - `cooking_planner_last_attempt_ok`: 0 if the last save failed
   - `cooking_planner_saves_total{result="ok|error"}`
   - `cooking_planner_plans{kind="plan|template"}`
+  - `cooking_planner_live_streams`: plan screens currently connected for live sync
 - The app is only used now and then, so there's **no "stale" alert**. A useful Grafana alert is `cooking_planner_last_attempt_ok == 0` (a save failed), plus the container being unhealthy.
 
 The header's "Updated" line shows the last successful save. It turns red only if a save fails, never just because time has passed.
+
+## Live sync
+
+Every device with a plan open sees changes from the others straight away, whether you're planning or cooking. Each open plan keeps a [server-sent events](https://developer.mozilla.org/en-US/docs/Web/API/Server-sent_events) stream to `GET /api/plans/:id/events`, and every save is pushed to all of them.
+
+Each save carries the plan's revision number. If two devices change the plan at the same moment, the second save is refused (409), and that device is told and shown the latest version; its clashing change is dropped. Phones that lose Wi-Fi reconnect on their own and catch up.
 
 ## Development
 

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import type { Dep, Group, Plan, PlanDoc, PlanSummary, Task } from "@cookplan/shared";
 import { db, transaction } from "../db.js";
+import { publish, openStream } from "../events.js";
 import { clonePlanSchema, createPlanSchema, idParams, planDocSchema } from "../schemas.js";
 
 function now(): string {
@@ -74,6 +75,7 @@ function rowToPlan(r: any): Plan {
     isTemplate: !!r.is_template,
     status: r.status,
     liveStartedAt: r.live_started_at,
+    revision: r.revision,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -191,6 +193,14 @@ export function planRoutes(app: FastifyInstance): void {
       if (nameTaken(doc.plan.name, planId)) {
         return reply.code(409).send({ error: `A plan called "${doc.plan.name}" already exists` });
       }
+      if (doc.plan.revision === undefined) {
+        return reply.code(409).send({ error: "This page is out of date. Reload it to get the latest version of the app." });
+      }
+      const current = (db.prepare("SELECT revision FROM plans WHERE id = ?").get(planId) as { revision: number }).revision;
+      if (doc.plan.revision !== current) {
+        // Someone else saved since this copy was loaded. Send back the latest so the client can show it.
+        return reply.code(409).send({ error: "This plan was changed on another device.", doc: loadDoc(planId) });
+      }
       const problem = docProblem(planId, doc);
       if (problem) return reply.code(400).send({ error: problem });
 
@@ -198,7 +208,7 @@ export function planRoutes(app: FastifyInstance): void {
         const d = doc;
         db.prepare(
           `UPDATE plans SET name=@name, mode=@mode, anchor_time=@anchorTime, is_template=@isTemplate,
-           status=@status, live_started_at=@liveStartedAt, updated_at=@updatedAt WHERE id=@id`,
+           status=@status, live_started_at=@liveStartedAt, revision=revision + 1, updated_at=@updatedAt WHERE id=@id`,
         ).run({
           id: planId,
           name: d.plan.name,
@@ -219,14 +229,26 @@ export function planRoutes(app: FastifyInstance): void {
         for (const t of d.tasks) tStmt.run({ ...t, planId });
         for (const dep of d.deps) dStmt.run({ ...dep, planId });
       });
-      return loadDoc(planId);
+      const saved = loadDoc(planId)!;
+      publish(planId, "plan", saved);
+      return saved;
     },
   );
 
   app.delete<{ Params: { id: string } }>("/api/plans/:id", { schema: { params: idParams } }, (req, reply) => {
     const info = db.prepare("DELETE FROM plans WHERE id = ?").run(req.params.id);
     if (info.changes === 0) return reply.code(404).send({ error: "plan not found" });
+    publish(req.params.id, "deleted", { id: req.params.id });
     reply.code(204).send();
+  });
+
+  // Live sync: a stream of "plan" (full document after each save) and "deleted" events.
+  app.get<{ Params: { id: string } }>("/api/plans/:id/events", { schema: { params: idParams } }, (req, reply) => {
+    if (!db.prepare("SELECT id FROM plans WHERE id = ?").get(req.params.id)) {
+      return reply.code(404).send({ error: "plan not found" });
+    }
+    reply.hijack(); // Fastify hands over the raw response; events.ts writes to it from now on
+    openStream(req.params.id, reply.raw);
   });
 
   // Clone a plan (optionally as/from a template). New ids throughout, live state reset.

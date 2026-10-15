@@ -24,7 +24,7 @@ import { chime } from "./utils/chime";
 import { hasUnsavedChanges, usePlanStore } from "./state/planStore";
 
 export default function App() {
-  const { doc, closePlan, saveState, lastSavedAt, error, updateDoc, saveAsTemplate } = usePlanStore();
+  const { doc, closePlan, saveState, lastSavedAt, error, notice, clearNotice, updateDoc, saveAsTemplate } = usePlanStore();
   const [editingTaskId, setEditingTaskId] = useState<string | null>(null);
   const [editingGroupId, setEditingGroupId] = useState<string | null>(null);
   const [zoomIdx, setZoomIdx] = useState(1);
@@ -54,6 +54,15 @@ export default function App() {
   useEffect(() => {
     document.body.classList.toggle("g-wide", planOpen);
   }, [planOpen]);
+
+  // Something changed on another device (live sync): say so for a little longer than a normal toast.
+  useEffect(() => {
+    if (!notice || !doc) return;
+    setToast(notice);
+    clearNotice();
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 8000);
+  }, [notice, doc, clearNotice]);
 
   // Closing or reloading the tab with an edit not yet saved: let the browser ask "Leave site?".
   useEffect(() => {
