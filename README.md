@@ -109,6 +109,11 @@ Set by the image (no need to change): `PORT=8000`, `DB_PATH=/data/app.db`, `CLIE
 
 The header's "Updated" line shows the last successful save. It turns red only if a save fails, never just because time has passed.
 
+## Planning help
+
+- **Kitchen clashes.** Set your kitchen once under **My kitchen** on the plan list (ovens and hob rings); each new plan copies it, and a plan can change its own copy in its settings. Tell each task what it **uses** (the hob, or an oven and its temperature) and the plan warns, never blocks, when two dishes need the same oven at different temperatures, or more pans need the hob than there are rings. Clashing tasks are outlined in red and listed above the timeline.
+- **Undo and redo** (Ctrl+Z, Ctrl+Shift+Z) for up to 50 planning edits.
+
 ## On cooking day
 
 Press **Start cooking** and the plan runs against the clock:

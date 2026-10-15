@@ -3,6 +3,7 @@ import type { PlanSummary } from "@cookplan/shared";
 import Modal from "./Modal";
 import AppHeader from "./AppHeader";
 import AppFooter from "./AppFooter";
+import KitchenSettings from "./KitchenSettings";
 import ConfirmDialog from "./ConfirmDialog";
 import { usePlanStore } from "../state/planStore";
 
@@ -65,6 +66,7 @@ function UseTemplateDialog({
 }
 
 export default function PlanList() {
+  const [kitchenOpen, setKitchenOpen] = useState(false);
   const { plans, plansLoading, error, notice, loadPlans, createPlan, deletePlan, openPlan } = usePlanStore();
   const [newName, setNewName] = useState("");
   const [usingTemplate, setUsingTemplate] = useState<PlanSummary | null>(null);
@@ -83,7 +85,12 @@ export default function PlanList() {
 
   return (
     <>
-    <AppHeader title="Cooking Planner" updatedIso={loaded ? lastChange : null} emptyText="No plans yet" />
+    <AppHeader title="Cooking Planner" updatedIso={loaded ? lastChange : null} emptyText="No plans yet">
+      <button className="btn btn-small" type="button" onClick={() => setKitchenOpen(true)}>
+        My kitchen
+      </button>
+    </AppHeader>
+    {kitchenOpen && <KitchenSettings onClose={() => setKitchenOpen(false)} />}
     <main className="wrap plan-list">
 
       <form

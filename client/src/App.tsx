@@ -1,7 +1,9 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { Group, Plan, Task } from "@cookplan/shared";
 import {
+  clashingTaskIds,
   currentTaskIds,
+  equipmentClashes,
   formatHM,
   liveWallClock,
   nextTaskIds,
@@ -22,6 +24,7 @@ import LiveTaskPanel from "./components/Live/LiveTaskPanel";
 import { useNow } from "./hooks/useNow";
 import LiveAlerts from "./components/Live/LiveAlerts";
 import KitchenView from "./components/Live/KitchenView";
+import ClashList from "./components/ClashList";
 import { useLiveView } from "./hooks/useLiveView";
 import { chime } from "./utils/chime";
 import { useKeepAwake } from "./hooks/useKeepAwake";
@@ -107,6 +110,13 @@ export default function App() {
   const [liveView, setLiveView] = useLiveView();
   const kitchen = isLive && liveView === "kitchen";
 
+  // Kitchen clashes (warnings only), shown while planning.
+  const clashes = useMemo(
+    () => (doc && doc.plan.status === "draft" ? equipmentClashes(doc.tasks, { ovens: doc.plan.ovens, hobRings: doc.plan.hobRings }) : []),
+    [doc],
+  );
+  const clashIds = useMemo(() => clashingTaskIds(clashes), [clashes]);
+
   if (!doc) return <PlanList />;
 
   const showToast = (msg: string) => {
@@ -138,6 +148,8 @@ export default function App() {
           status: "pending",
           actualStartAt: null,
           actualDoneAt: null,
+          equipment: null,
+          ovenTemp: null,
         } satisfies Task,
       ],
     }));
@@ -433,6 +445,11 @@ export default function App() {
           />
         </div>
       )}
+      {clashes.length > 0 && (
+        <div className="wrap">
+          <ClashList doc={doc} clashes={clashes} onOpenTask={(t) => setEditingTaskId(t.id)} />
+        </div>
+      )}
       <div className="wrap timeline-wrap" hidden={kitchen}>
       <TimelineCanvas
         doc={doc}
@@ -448,6 +465,7 @@ export default function App() {
         onTaskTimeChange={changeTaskTime}
         onReorder={reorderTasks}
         onLockedDragAttempt={handleLockedDragAttempt}
+        barClass={(t) => (clashIds.has(t.id) ? "task-bar-clash" : "")}
       />
       </div>
 

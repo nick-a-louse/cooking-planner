@@ -19,6 +19,8 @@ function task(id: string, startMin: number, durationMin: number): Task {
     status: "pending",
     actualStartAt: null,
     actualDoneAt: null,
+    equipment: null,
+    ovenTemp: null,
   };
 }
 

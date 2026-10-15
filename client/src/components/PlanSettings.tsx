@@ -1,6 +1,6 @@
 import { useState } from "react";
 import type { Plan, PlanMode } from "@cookplan/shared";
-import { ALERT_LEAD_OPTIONS } from "@cookplan/shared";
+import { ALERT_LEAD_OPTIONS, MAX_HOB_RINGS, MAX_OVENS } from "@cookplan/shared";
 import Modal from "./Modal";
 import { planNameTaken } from "./PlanList";
 import { usePlanStore } from "../state/planStore";
@@ -19,6 +19,8 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
   const [mode, setMode] = useState<PlanMode>(plan.mode);
   const [anchorTime, setAnchorTime] = useState(plan.anchorTime);
   const [alertLeadMin, setAlertLeadMin] = useState(plan.alertLeadMin);
+  const [ovens, setOvens] = useState(plan.ovens);
+  const [hobRings, setHobRings] = useState(plan.hobRings);
   const plans = usePlanStore((s) => s.plans);
   const taken = planNameTaken(plans, name, plan.id);
 
@@ -29,7 +31,7 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
         onSubmit={(e) => {
           e.preventDefault();
           if (taken) return;
-          onSave({ ...plan, name: name.trim() || plan.name, mode, anchorTime, alertLeadMin });
+          onSave({ ...plan, name: name.trim() || plan.name, mode, anchorTime, alertLeadMin, ovens, hobRings });
         }}
       >
         <label>
@@ -72,6 +74,29 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
             The last task ends exactly at this time — every task's start is worked out backward from it.
           </p>
         )}
+        <div className="field-row">
+          <label>
+            Ovens
+            <input
+              type="number"
+              min={0}
+              max={MAX_OVENS}
+              value={ovens}
+              onChange={(e) => setOvens(clampInt(e.target.value, MAX_OVENS))}
+            />
+          </label>
+          <label>
+            Hob rings
+            <input
+              type="number"
+              min={0}
+              max={MAX_HOB_RINGS}
+              value={hobRings}
+              onChange={(e) => setHobRings(clampInt(e.target.value, MAX_HOB_RINGS))}
+            />
+          </label>
+        </div>
+        <p className="muted small">This plan's kitchen, used to warn about oven and hob clashes. New plans start from My kitchen on the plan list.</p>
         <div className="field">
           <span id="lead-label">Warning before each task starts (live run)</span>
           <div className="seg" role="radiogroup" aria-labelledby="lead-label">
@@ -108,4 +133,10 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
       </form>
     </Modal>
   );
+}
+
+/** A whole number from 0 to max, from a number box (empty counts as 0). */
+export function clampInt(value: string, max: number): number {
+  const n = Math.round(Number(value));
+  return Number.isFinite(n) ? Math.min(max, Math.max(0, n)) : 0;
 }

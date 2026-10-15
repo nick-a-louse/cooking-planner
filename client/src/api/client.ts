@@ -1,4 +1,4 @@
-import type { PlanDoc, PlanSummary } from "@cookplan/shared";
+import type { Kitchen, PlanDoc, PlanSummary } from "@cookplan/shared";
 
 /** A failed API call. `body` is the server's JSON reply, e.g. { error, doc } on a 409. */
 export class ApiError extends Error {
@@ -34,6 +34,8 @@ export const api = {
   /** Server-sent events for one plan: "plan" after every save, "deleted" when it's removed. */
   planEventsUrl: (id: string) => `/api/plans/${id}/events`,
   deletePlan: (id: string) => request<void>(`/api/plans/${id}`, { method: "DELETE" }),
+  getKitchen: () => request<Kitchen>("/api/settings/kitchen"),
+  saveKitchen: (k: Kitchen) => request<Kitchen>("/api/settings/kitchen", { method: "PUT", body: JSON.stringify(k) }),
   clonePlan: (id: string, opts: { name?: string; asTemplate?: boolean; anchorTime?: string } = {}) =>
     request<PlanDoc>(`/api/plans/${id}/clone`, { method: "POST", body: JSON.stringify(opts) }),
 };

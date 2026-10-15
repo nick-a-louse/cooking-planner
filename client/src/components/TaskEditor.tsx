@@ -1,6 +1,8 @@
 import { useState } from "react";
 import type { PlanDoc, Task } from "@cookplan/shared";
 import {
+  ovenLabel,
+  ovenOf,
   DEFAULT_TASK_COLOR,
   formatHM,
   planEndMin,
@@ -44,6 +46,11 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
   const [notes, setNotes] = useState(task.notes);
   const [kind, setKind] = useState(task.kind);
   const [predIds, setPredIds] = useState<string[]>(predecessorsOf(task.id, doc.deps));
+  const [equipment, setEquipment] = useState(task.equipment ?? "");
+  const [ovenTemp, setOvenTemp] = useState(task.ovenTemp?.toString() ?? "");
+  const isOven = equipment.startsWith("oven-");
+  // Offer the plan's ovens, plus this task's own if the plan has since lost it, so it isn't silently cleared.
+  const ovenCount = Math.max(doc.plan.ovens, ovenOf(task) ?? 0);
   const [confirmingDelete, setConfirmingDelete] = useState(false);
 
   const grouped = groupId !== "";
@@ -70,6 +77,8 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
               durationMin: snapDuration(duration),
               color: grouped ? null : color,
               notes,
+              equipment: equipment || null,
+              ovenTemp: isOven && ovenTemp.trim() !== "" ? Math.min(350, Math.max(0, Math.round(Number(ovenTemp)) || 0)) : null,
             },
             predIds,
           );
@@ -90,6 +99,35 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
             ))}
           </select>
         </label>
+        <div className="field-row">
+          <label>
+            Uses
+            <select value={equipment} onChange={(e) => setEquipment(e.target.value)}>
+              <option value="">Nothing to track</option>
+              {(doc.plan.hobRings > 0 || equipment === "hob") && <option value="hob">Hob (one ring)</option>}
+              {Array.from({ length: ovenCount }, (_, i) => (
+                <option key={i} value={`oven-${i + 1}`}>
+                  {ovenLabel(i + 1, doc.plan.ovens)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {isOven && (
+            <label>
+              Temperature (°C)
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={350}
+                step={5}
+                value={ovenTemp}
+                placeholder="e.g. 180"
+                onChange={(e) => setOvenTemp(e.target.value)}
+              />
+            </label>
+          )}
+        </div>
         <div className="field-row">
           <label>
             Start

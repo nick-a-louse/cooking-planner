@@ -3,7 +3,8 @@ import { nanoid } from "nanoid";
 import type { Dep, Group, Plan, PlanDoc, PlanSummary, Task } from "@cookplan/shared";
 import { db, transaction } from "../db.js";
 import { publish, openStream } from "../events.js";
-import { clonePlanSchema, createPlanSchema, idParams, planDocSchema } from "../schemas.js";
+import { clonePlanSchema, createPlanSchema, idParams, kitchenSchema, planDocSchema } from "../schemas.js";
+import { DEFAULT_KITCHEN, type Kitchen } from "@cookplan/shared";
 
 function now(): string {
   return new Date().toISOString();
@@ -77,6 +78,8 @@ function rowToPlan(r: any): Plan {
     liveStartedAt: r.live_started_at,
     revision: r.revision,
     alertLeadMin: r.alert_lead_min,
+    ovens: r.ovens,
+    hobRings: r.hob_rings,
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   };
@@ -101,6 +104,8 @@ function rowToTask(r: any): Task {
     status: r.status,
     actualStartAt: r.actual_start_at,
     actualDoneAt: r.actual_done_at,
+    equipment: r.equipment ?? null,
+    ovenTemp: r.oven_temp ?? null,
   };
 }
 
@@ -123,7 +128,13 @@ function loadDoc(planId: string): PlanDoc | null {
 }
 
 /** Per-plan settings that a copy or a plan made from a template keeps. */
-const SETTINGS_COLUMNS = ["alert_lead_min"];
+const SETTINGS_COLUMNS = ["alert_lead_min", "ovens", "hob_rings"];
+
+/** "My kitchen": the default equipment for new plans. */
+export function getKitchen(): Kitchen {
+  const row = db.prepare("SELECT value FROM settings WHERE key = 'kitchen'").get() as { value: string } | undefined;
+  return row ? { ...DEFAULT_KITCHEN, ...JSON.parse(row.value) } : DEFAULT_KITCHEN;
+}
 
 function copyPlanSettings(fromId: string, toId: string): void {
   const set = SETTINGS_COLUMNS.map((c) => `${c} = (SELECT ${c} FROM plans WHERE id = @fromId)`).join(", ");
@@ -136,8 +147,8 @@ const insertGroup = () =>
   );
 const insertTask = () =>
   db.prepare(
-    `INSERT INTO tasks (id, plan_id, group_id, kind, name, start_min, duration_min, color, notes, sort_order, status, actual_start_at, actual_done_at)
-     VALUES (@id, @planId, @groupId, @kind, @name, @startMin, @durationMin, @color, @notes, @sortOrder, @status, @actualStartAt, @actualDoneAt)`,
+    `INSERT INTO tasks (id, plan_id, group_id, kind, name, start_min, duration_min, color, notes, sort_order, status, actual_start_at, actual_done_at, equipment, oven_temp)
+     VALUES (@id, @planId, @groupId, @kind, @name, @startMin, @durationMin, @color, @notes, @sortOrder, @status, @actualStartAt, @actualDoneAt, @equipment, @ovenTemp)`,
   );
 const insertDep = () =>
   db.prepare(
@@ -172,10 +183,11 @@ export function planRoutes(app: FastifyInstance): void {
       }
       const id = nanoid(10);
       const ts = now();
+      const kitchen = getKitchen();
       db.prepare(
-        `INSERT INTO plans (id, name, mode, anchor_time, is_template, status, created_at, updated_at)
-         VALUES (?, ?, ?, ?, 0, 'draft', ?, ?)`,
-      ).run(id, finalName, mode === "backward" ? "backward" : "forward", anchorTime ?? defaultAnchor(), ts, ts);
+        `INSERT INTO plans (id, name, mode, anchor_time, is_template, status, created_at, updated_at, ovens, hob_rings)
+         VALUES (?, ?, ?, ?, 0, 'draft', ?, ?, ?, ?)`,
+      ).run(id, finalName, mode === "backward" ? "backward" : "forward", anchorTime ?? defaultAnchor(), ts, ts, kitchen.ovens, kitchen.hobRings);
       reply.code(201);
       return loadDoc(id);
     },
@@ -218,7 +230,8 @@ export function planRoutes(app: FastifyInstance): void {
         db.prepare(
           `UPDATE plans SET name=@name, mode=@mode, anchor_time=@anchorTime, is_template=@isTemplate,
            status=@status, live_started_at=@liveStartedAt, revision=revision + 1, updated_at=@updatedAt,
-           alert_lead_min=COALESCE(@alertLeadMin, alert_lead_min) WHERE id=@id`,
+           alert_lead_min=COALESCE(@alertLeadMin, alert_lead_min), ovens=COALESCE(@ovens, ovens),
+           hob_rings=COALESCE(@hobRings, hob_rings) WHERE id=@id`,
         ).run({
           id: planId,
           name: d.plan.name,
@@ -229,6 +242,8 @@ export function planRoutes(app: FastifyInstance): void {
           liveStartedAt: d.plan.liveStartedAt,
           updatedAt: now(),
           alertLeadMin: d.plan.alertLeadMin ?? null,
+          ovens: d.plan.ovens ?? null,
+          hobRings: d.plan.hobRings ?? null,
         });
         db.prepare("DELETE FROM deps WHERE plan_id = ?").run(planId);
         db.prepare("DELETE FROM tasks WHERE plan_id = ?").run(planId);
@@ -237,7 +252,8 @@ export function planRoutes(app: FastifyInstance): void {
         const tStmt = insertTask();
         const dStmt = insertDep();
         for (const g of d.groups) gStmt.run({ ...g, planId });
-        for (const t of d.tasks) tStmt.run({ ...t, planId });
+        // equipment/ovenTemp may be missing from a page older than the equipment feature.
+        for (const t of d.tasks) tStmt.run({ ...t, equipment: t.equipment ?? null, ovenTemp: t.ovenTemp ?? null, planId });
         for (const dep of d.deps) dStmt.run({ ...dep, planId });
       });
       const saved = loadDoc(planId)!;
@@ -251,6 +267,16 @@ export function planRoutes(app: FastifyInstance): void {
     if (info.changes === 0) return reply.code(404).send({ error: "plan not found" });
     publish(req.params.id, "deleted", { id: req.params.id });
     reply.code(204).send();
+  });
+
+  // "My kitchen": the default ovens and hob rings for new plans.
+  app.get("/api/settings/kitchen", () => getKitchen());
+  app.put<{ Body: Kitchen }>("/api/settings/kitchen", { schema: { body: kitchenSchema } }, (req) => {
+    const kitchen = { ovens: req.body.ovens, hobRings: req.body.hobRings };
+    db.prepare("INSERT INTO settings (key, value) VALUES ('kitchen', ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(
+      JSON.stringify(kitchen),
+    );
+    return kitchen;
   });
 
   // Live sync: a stream of "plan" (full document after each save) and "deleted" events.

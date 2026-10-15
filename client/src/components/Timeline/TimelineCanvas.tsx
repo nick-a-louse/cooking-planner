@@ -37,6 +37,8 @@ interface Props {
   onTaskTimeChange: (taskId: string, startMin: number, durationMin: number) => void;
   onReorder: (orderedTaskIds: string[], movedTaskId: string) => void;
   onLockedDragAttempt: (task: Task) => void;
+  /** Extra classes for a task's bar, e.g. a clash outline. */
+  barClass?: (task: Task) => string;
 }
 
 interface Section {
@@ -93,6 +95,7 @@ export default function TimelineCanvas({
   onTaskTimeChange,
   onReorder,
   onLockedDragAttempt,
+  barClass,
 }: Props) {
   const { plan, groups, tasks } = doc;
   const pxPerMin = ZOOM_LEVELS[zoomIdx];
@@ -205,13 +208,12 @@ export default function TimelineCanvas({
                         forceForward={liveZeroAt !== null}
                         locked={lockedIds.has(task.id)}
                         readOnly={readOnly}
-                        liveClass={
-                          task.status === "done"
-                            ? "task-bar-done"
-                            : liveCurrent.has(task.id)
-                              ? "task-bar-current"
-                              : ""
-                        }
+                        liveClass={[
+                          task.status === "done" ? "task-bar-done" : liveCurrent.has(task.id) ? "task-bar-current" : "",
+                          barClass?.(task) ?? "",
+                        ]
+                          .filter(Boolean)
+                          .join(" ")}
                         linkSelected={linkPredecessorId === task.id}
                         onClick={() => onTaskClick(task)}
                         onCommit={(s, d) => onTaskTimeChange(task.id, s, d)}

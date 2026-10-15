@@ -70,7 +70,7 @@ describe("plan validation", () => {
     (await app.inject({ method: "POST", url: "/api/plans", payload: { name } })).json();
   const task = (planId: string, id: string, extra: Record<string, unknown> = {}) => ({
     id, planId, groupId: null, kind: "task", name: id, startMin: 0, durationMin: 10, color: null,
-    notes: "", sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, ...extra,
+    notes: "", sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: null, ovenTemp: null, ...extra,
   });
   const put = (doc: any) => app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: doc });
 
@@ -187,5 +187,40 @@ describe("live sync", () => {
 
   it("returns 404 for the stream of a plan that doesn't exist", async () => {
     expect((await app.inject("/api/plans/nope/events")).statusCode).toBe(404);
+  });
+});
+
+describe("kitchen and equipment", () => {
+  const newPlan = async (name: string) =>
+    (await app.inject({ method: "POST", url: "/api/plans", payload: { name } })).json();
+
+  it("copies My kitchen into each new plan, which can then differ", async () => {
+    expect((await app.inject("/api/settings/kitchen")).json()).toEqual({ ovens: 1, hobRings: 4 });
+    const set = await app.inject({ method: "PUT", url: "/api/settings/kitchen", payload: { ovens: 2, hobRings: 5 } });
+    expect(set.json()).toEqual({ ovens: 2, hobRings: 5 });
+    const doc = await newPlan("Kitchen copy");
+    expect(doc.plan).toMatchObject({ ovens: 2, hobRings: 5 });
+    doc.plan.ovens = 1;
+    const saved = await app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: doc });
+    expect(saved.json().plan.ovens).toBe(1);
+    expect((await app.inject("/api/settings/kitchen")).json().ovens).toBe(2);
+    const clone = await app.inject({ method: "POST", url: `/api/plans/${doc.plan.id}/clone`, payload: { name: "Kitchen copy 2" } });
+    expect(clone.json().plan).toMatchObject({ ovens: 1, hobRings: 5 });
+    await app.inject({ method: "PUT", url: "/api/settings/kitchen", payload: { ovens: 1, hobRings: 4 } });
+  });
+
+  it("rejects an impossible kitchen", async () => {
+    expect((await app.inject({ method: "PUT", url: "/api/settings/kitchen", payload: { ovens: 9, hobRings: 4 } })).statusCode).toBe(400);
+  });
+
+  it("saves and reloads what each task uses, and rejects unknown equipment", async () => {
+    const doc = await newPlan("Equipment");
+    const t = { id: "eq1", planId: doc.plan.id, groupId: null, kind: "task", name: "Roast", startMin: 0, durationMin: 60, color: null, notes: "", sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: "oven-1", ovenTemp: 180 };
+    doc.tasks = [t];
+    const r = await app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: doc });
+    expect(r.json().tasks[0]).toMatchObject({ equipment: "oven-1", ovenTemp: 180 });
+    const bad = r.json();
+    bad.tasks[0].equipment = "grill";
+    expect((await app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: bad })).statusCode).toBe(400);
   });
 });
