@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { PlanDoc, ShiftProposal, Task } from "@cookplan/shared";
 import { formatDuration, liveWallClock, formatHM, nowOffsetMin, proposeShift } from "@cookplan/shared";
 import Modal from "../Modal";
@@ -9,9 +9,11 @@ interface Props {
   liveZeroAt: string;
   onComplete: (task: Task, actualEndMin: number, applyShift: boolean) => void;
   onClose: () => void;
+  /** Mark it done straight away (the kitchen view's Done button); still asks about shifting. */
+  markDoneNow?: boolean;
 }
 
-export default function LiveTaskPanel({ doc, task, liveZeroAt, onComplete, onClose }: Props) {
+export default function LiveTaskPanel({ doc, task, liveZeroAt, onComplete, onClose, markDoneNow }: Props) {
   const [proposal, setProposal] = useState<ShiftProposal | null>(null);
   const [pendingEndMin, setPendingEndMin] = useState(0);
 
@@ -29,6 +31,15 @@ export default function LiveTaskPanel({ doc, task, liveZeroAt, onComplete, onClo
     setPendingEndMin(actualEndMin);
     setProposal(p);
   };
+
+  useEffect(() => {
+    if (markDoneNow && task.status !== "done") handleDone();
+    // Run once when opened; handleDone reads the latest props.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Done with nothing to shift completes at once: don't flash the panel.
+  if (markDoneNow && !proposal && task.status !== "done") return null;
 
   return (
     <Modal title={task.kind === "wait" ? `⏸ ${task.name}` : task.name} onClose={onClose}>

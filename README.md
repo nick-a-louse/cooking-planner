@@ -114,6 +114,7 @@ The header's "Updated" line shows the last successful save. It turns red only if
 Press **Start cooking** and the plan runs against the clock:
 
 - **The screen stays on** while the run is live, so a phone propped up in the kitchen doesn't lock. Over HTTPS this uses the browser's [Screen Wake Lock API](https://developer.mozilla.org/en-US/docs/Web/API/Screen_Wake_Lock_API); over plain HTTP (a home network) it loops a tiny silent video instead.
+- **Kitchen view**: switch a live plan from *Timeline* to *Kitchen* for large text you can read across the room: what to do now (with time left, or how late it is, and a Done button) and what's next, with countdowns. The choice is remembered per device.
 - **Alerts** (a chime and a banner that stays until dismissed) when a task is coming up, should start now, should be finished, or a wait is over. Set the warning time (1, 2, 5 or 10 minutes) in plan settings. **Sound on/off** is remembered per device. Alerts work while the app is open on screen; there are no push notifications.
 
 ## Live sync
