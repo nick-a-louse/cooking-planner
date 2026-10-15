@@ -834,3 +834,178 @@ button.rail-cell:hover .drag-grip {
 .toolbar button[aria-pressed="true"] {
   color: var(--muted);
 }
+
+/* Kitchen view (live run): big text, readable from across the kitchen */
+.kitchen-wrap {
+  flex: 1;
+  padding-block: 4px 24px;
+}
+.kitchen {
+  display: grid;
+  grid-template-columns: minmax(0, 3fr) minmax(0, 2fr);
+  gap: 24px;
+  align-items: start;
+}
+.kitchen-heading {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.kitchen-now,
+.kitchen-next {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.kitchen-card {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 10px solid var(--faint);
+  border-radius: var(--radius);
+  padding: 16px;
+}
+.kitchen-card-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+}
+.kitchen-meta {
+  font-size: 15px;
+  color: var(--muted);
+}
+.kitchen-task {
+  font-size: clamp(26px, 3.2vw, 38px);
+  font-weight: 700;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+.kitchen-notes {
+  font-size: 18px;
+  margin-top: 4px;
+  white-space: pre-wrap;
+}
+.kitchen-side {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+.kitchen-count {
+  font-size: clamp(40px, 5vw, 64px);
+  line-height: 1;
+}
+.kitchen-count.late {
+  color: var(--bad);
+}
+.kitchen-count-label {
+  font-size: 14px;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.kitchen-done {
+  margin-top: auto;
+  min-width: 120px;
+  min-height: 52px;
+  font-size: 20px;
+}
+.kitchen-idle {
+  font-size: 22px;
+  padding: 16px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius);
+}
+.kitchen-next-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 8px solid var(--faint);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  cursor: pointer;
+}
+.kitchen-next-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.kitchen-next-task {
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.kitchen-next-count {
+  flex: none;
+  font-size: 30px;
+}
+.kitchen-empty {
+  display: block;
+  text-align: center;
+  padding: 48px 16px;
+}
+.kitchen-empty-title {
+  font-size: 32px;
+  font-weight: 700;
+}
+
+@media (max-width: 760px) {
+  .kitchen {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .kitchen-card {
+    flex-direction: column;
+  }
+  .kitchen-side {
+    flex-direction: row;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .kitchen-count-label {
+    margin-bottom: 0;
+  }
+  .kitchen-done {
+    margin-top: 0;
+    margin-left: auto;
+  }
+}
+/* The toolbar's button style would give each segment its own border: keep the kit's segmented look */
+.toolbar .seg button {
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+}
+.toolbar .seg button + button {
+  border-left: 1px solid var(--line-strong);
+}
+.toolbar .seg button[aria-checked="true"] {
+  background: var(--accent);
+  color: var(--on-accent);
+}
+.kitchen-done {
+  font-weight: 700;
+  border-width: 2px;
+  border-color: var(--ink);
+}

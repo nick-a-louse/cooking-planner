@@ -21,6 +21,8 @@ import StartDialog from "./components/Live/StartDialog";
 import LiveTaskPanel from "./components/Live/LiveTaskPanel";
 import { useNow } from "./hooks/useNow";
 import LiveAlerts from "./components/Live/LiveAlerts";
+import KitchenView from "./components/Live/KitchenView";
+import { useLiveView } from "./hooks/useLiveView";
 import { chime } from "./utils/chime";
 import { useKeepAwake } from "./hooks/useKeepAwake";
 import { useMuted } from "./hooks/useMuted";
@@ -37,6 +39,8 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [startDialogOpen, setStartDialogOpen] = useState(false);
   const [liveTaskId, setLiveTaskId] = useState<string | null>(null);
+  /** Opened from the kitchen view's Done button: go straight to marking it done. */
+  const [liveTaskDone, setLiveTaskDone] = useState(false);
   const [leaveUnsaved, setLeaveUnsaved] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const now = useNow();
@@ -80,6 +84,8 @@ export default function App() {
   // Live run: keep the screen on, and alert (sound + banner) at each task's moments.
   useKeepAwake(isLive);
   const [muted, toggleMuted] = useMuted();
+  const [liveView, setLiveView] = useLiveView();
+  const kitchen = isLive && liveView === "kitchen";
 
   if (!doc) return <PlanList />;
 
@@ -345,7 +351,7 @@ export default function App() {
         )}
         {isLive && nowMin !== null && liveZeroAt && (
           <>
-            <span className="live-status">
+            <span className="live-status" hidden={kitchen}>
               {(() => {
                 const current = doc.tasks.filter((t) => currentTaskIds(doc.tasks, nowMin).has(t.id));
                 const next = doc.tasks.filter((t) => nextTaskIds(doc.tasks, nowMin).has(t.id));
@@ -358,6 +364,13 @@ export default function App() {
               })()}
             </span>
             <span className="spacer" />
+            <div className="seg" role="radiogroup" aria-label="View">
+              {(["timeline", "kitchen"] as const).map((v) => (
+                <button key={v} type="button" role="radio" aria-checked={liveView === v} onClick={() => setLiveView(v)}>
+                  {v === "timeline" ? "Timeline" : "Kitchen"}
+                </button>
+              ))}
+            </div>
             <button onClick={toggleMuted} aria-pressed={muted} title={muted ? "Alert sounds are off on this device" : "Alert sounds are on"}>
               {muted ? "Sound off" : "Sound on"}
             </button>
@@ -366,15 +379,35 @@ export default function App() {
         )}
         {doc.plan.status === "done" && <span className="live-status muted">Run finished</span>}
         {!isLive && <span className="spacer" />}
-        <button onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))} disabled={zoomIdx === 0} aria-label="Zoom out">
-          −
-        </button>
-        <button onClick={() => setZoomIdx(Math.min(2, zoomIdx + 1))} disabled={zoomIdx === 2} aria-label="Zoom in">
-          +
-        </button>
+        {!kitchen && (
+          <>
+            <button onClick={() => setZoomIdx(Math.max(0, zoomIdx - 1))} disabled={zoomIdx === 0} aria-label="Zoom out">
+              −
+            </button>
+            <button onClick={() => setZoomIdx(Math.min(2, zoomIdx + 1))} disabled={zoomIdx === 2} aria-label="Zoom in">
+              +
+            </button>
+          </>
+        )}
       </div>
 
-      <div className="wrap timeline-wrap">
+      {kitchen && liveZeroAt && (
+        <div className="wrap kitchen-wrap">
+          <KitchenView
+            doc={doc}
+            liveZeroAt={liveZeroAt}
+            onOpen={(t) => {
+              setLiveTaskDone(false);
+              setLiveTaskId(t.id);
+            }}
+            onDone={(t) => {
+              setLiveTaskDone(true);
+              setLiveTaskId(t.id);
+            }}
+          />
+        </div>
+      )}
+      <div className="wrap timeline-wrap" hidden={kitchen}>
       <TimelineCanvas
         doc={doc}
         zoomIdx={zoomIdx}
@@ -428,11 +461,13 @@ export default function App() {
         <StartDialog doc={doc} onStart={startRun} onClose={() => setStartDialogOpen(false)} />
       )}
 
-      {liveTaskId && liveZeroAt && (
+      {liveTaskId && liveZeroAt && doc.tasks.some((t) => t.id === liveTaskId) && (
         <LiveTaskPanel
+          key={`${liveTaskId}-${liveTaskDone}`}
           doc={doc}
           task={doc.tasks.find((t) => t.id === liveTaskId)!}
           liveZeroAt={liveZeroAt}
+          markDoneNow={liveTaskDone}
           onComplete={completeTask}
           onClose={() => setLiveTaskId(null)}
         />
