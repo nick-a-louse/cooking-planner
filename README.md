@@ -114,6 +114,7 @@ The header's "Updated" line shows the last successful save. It turns red only if
 - **Kitchen clashes.** Set your kitchen once under **My kitchen** on the plan list (ovens and hob rings); each new plan copies it, and a plan can change its own copy in its settings. Tell each task what it **uses** (the hob, or an oven and its temperature) and the plan warns, never blocks, when two dishes need the same oven at different temperatures, or more pans need the hob than there are rings. Clashing tasks are outlined in red and listed above the timeline.
 - **Hands-on overlaps.** Tasks need someone's hands unless ticked *Hands-off* (e.g. roasting); waits never do. Set how many **cooks** a plan has, and it warns when more hands-on tasks overlap than that (amber dashed outline, listed with the kitchen clashes).
 - **Critical path.** The *Critical path* button outlines the chain of tasks that decides when the meal is ready (a delay to any of them makes it later) and dims the rest.
+- **Print** (button in the plan header): page 1 is the whole timeline on one page, then a timed checklist with tick boxes, in time order with equipment and notes. Black on white whatever the screen theme; use the print dialog's *Save as PDF* for a file.
 - **Undo and redo** (Ctrl+Z, Ctrl+Shift+Z) for up to 50 planning edits.
 
 ## On cooking day

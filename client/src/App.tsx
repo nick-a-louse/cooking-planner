@@ -27,6 +27,7 @@ import { useNow } from "./hooks/useNow";
 import LiveAlerts from "./components/Live/LiveAlerts";
 import KitchenView from "./components/Live/KitchenView";
 import PlanWarnings from "./components/PlanWarnings";
+import PrintView from "./components/PrintView";
 import { useLiveView } from "./hooks/useLiveView";
 import { chime } from "./utils/chime";
 import { useKeepAwake } from "./hooks/useKeepAwake";
@@ -369,6 +370,9 @@ export default function App() {
         <button className="btn btn-small" onClick={() => setSettingsOpen(true)} title="Plan settings">
           {doc.plan.mode === "backward" ? "Finish" : "Start"} {doc.plan.anchorTime.slice(11, 16)}
         </button>
+        <button className="btn btn-small" onClick={() => window.print()} title="Print a timeline and a timed checklist, or save them as a PDF">
+          Print
+        </button>
       </AppHeader>
 
       <div className="wrap toolbar">
@@ -544,6 +548,7 @@ export default function App() {
         />
       )}
 
+      <PrintView doc={doc} />
       {isLive && liveZeroAt && <LiveAlerts doc={doc} liveZeroAt={liveZeroAt} muted={muted} />}
       {leaveUnsaved && (
         <ConfirmDialog
