@@ -40,6 +40,23 @@ describe("runtime contract", () => {
     expect(body).toMatch(/cooking_planner_last_success_timestamp_seconds [1-9]/);
   });
 
+  // Regression: deleting a plan returned 400 because the client labelled the body-less
+  // DELETE as JSON. Both the current client (no header) and old cached ones must work.
+  it.each([
+    ["without a content type", {}],
+    ["with an empty JSON body (older clients)", { "content-type": "application/json" }],
+  ])("deletes a plan %s", async (label, headers) => {
+    const created = (await app.inject({ method: "POST", url: "/api/plans", payload: { name: `To delete ${label}` } })).json();
+    const url = `/api/plans/${created.plan.id}`;
+    expect((await app.inject({ method: "DELETE", url, headers })).statusCode).toBe(204);
+    expect((await app.inject(url)).statusCode).toBe(404);
+  });
+
+  it("still rejects malformed JSON", async () => {
+    const r = await app.inject({ method: "POST", url: "/api/plans", headers: { "content-type": "application/json" }, payload: "{nope" });
+    expect(r.statusCode).toBe(400);
+  });
+
   it("serves the page for app routes, JSON 404 for unknown API paths, and the manifest type", async () => {
     expect((await app.inject("/some/page")).body).toContain("gomez-ui.css");
     expect((await app.inject("/api/nope")).statusCode).toBe(404);

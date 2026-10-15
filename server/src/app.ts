@@ -34,6 +34,16 @@ export async function buildApp(opts: { clientDist?: string } = {}): Promise<Fast
     if (!ok) req.log.warn({ status: reply.statusCode, url: req.url }, "plan save failed");
   });
 
+  // Accept an empty body sent as JSON (Fastify's default parser answers 400). Older
+  // copies of the client labelled every request as JSON, including body-less DELETEs.
+  // Everything non-empty still goes through Fastify's own hardened JSON parser.
+  const jsonParser = app.getDefaultJsonParser("error", "error");
+  app.removeContentTypeParser("application/json");
+  app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, done) => {
+    if ((body as string).trim() === "") return done(null, undefined);
+    jsonParser(req, body as string, done);
+  });
+
   planRoutes(app);
 
   // Kept for anything still using the old path; /healthz is the standard one.
