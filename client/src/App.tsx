@@ -16,11 +16,12 @@ import TimelineCanvas from "./components/Timeline/TimelineCanvas";
 import TaskEditor from "./components/TaskEditor";
 import GroupEditor from "./components/GroupEditor";
 import PlanSettings from "./components/PlanSettings";
+import ConfirmDialog from "./components/ConfirmDialog";
 import StartDialog from "./components/Live/StartDialog";
 import LiveTaskPanel from "./components/Live/LiveTaskPanel";
 import { useNow } from "./hooks/useNow";
 import { chime } from "./utils/chime";
-import { usePlanStore } from "./state/planStore";
+import { hasUnsavedChanges, usePlanStore } from "./state/planStore";
 
 export default function App() {
   const { doc, closePlan, saveState, lastSavedAt, error, updateDoc, saveAsTemplate } = usePlanStore();
@@ -33,6 +34,7 @@ export default function App() {
   const [toast, setToast] = useState<string | null>(null);
   const [startDialogOpen, setStartDialogOpen] = useState(false);
   const [liveTaskId, setLiveTaskId] = useState<string | null>(null);
+  const [leaveUnsaved, setLeaveUnsaved] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const notifiedRef = useRef<Set<string>>(new Set());
   const now = useNow();
@@ -52,6 +54,17 @@ export default function App() {
   useEffect(() => {
     document.body.classList.toggle("g-wide", planOpen);
   }, [planOpen]);
+
+  // Closing or reloading the tab with an edit not yet saved: let the browser ask "Leave site?".
+  useEffect(() => {
+    const warn = (e: BeforeUnloadEvent) => {
+      if (!hasUnsavedChanges()) return;
+      e.preventDefault();
+      e.returnValue = ""; // older browsers need this as well
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, []);
 
   // Live reminders: chime + toast when a pending task starts within ~2 minutes.
   useEffect(() => {
@@ -299,7 +312,10 @@ export default function App() {
         updatedIso={lastSavedAt ?? ""}
         updatedError={saveState === "error" ? error ?? "The last save didn't reach the server" : null}
       >
-        <button className="btn btn-small" onClick={closePlan}>
+        <button className="btn btn-small" onClick={async () => {
+            if (!(await closePlan())) setLeaveUnsaved(true);
+          }}
+        >
           <BackIcon /> Plans
         </button>
         <button className="btn btn-small" onClick={() => setSettingsOpen(true)} title="Plan settings">
@@ -422,6 +438,15 @@ export default function App() {
         />
       )}
 
+      {leaveUnsaved && (
+        <ConfirmDialog
+          title="Your last change wasn't saved"
+          message={`${error ?? "The server didn't accept the save."} If you leave now, that change is lost.`}
+          confirmLabel="Leave without saving"
+          onConfirm={() => void closePlan(true)}
+          onClose={() => setLeaveUnsaved(false)}
+        />
+      )}
       {toast && <div className="toast">{toast}</div>}
     </div>
   );

@@ -1,12 +1,46 @@
 # Cooking Planner
 
+![A Christmas dinner plan: dishes as coloured bars on a timeline, with arrows for the steps that depend on each other](docs/screenshot.png)
+
 A Gantt-style planner for timing big meals, such as Christmas dinner. Lay out each dish as tasks on a shared timeline, link the ones that depend on each other, plan forwards from a start time or backwards from when food should be on the table, then follow the plan live on cooking day. Runs self-hosted in Docker.
 
 ## Why
 
 Big meals need several dishes, each with several steps, to finish at the same moment. A timeline with dependencies (like a project plan) makes the timing visible and does the arithmetic when something runs late. It follows my shared app standard (see [How this was built](#how-this-was-built)).
 
-## Set up (Docker)
+## Run it yourself
+
+You need Docker. The app is one container with a SQLite database in a folder you choose.
+
+> **There's no login.** Anyone who can reach the port can view, change and delete plans. Run it on your home network or behind a VPN (e.g. Tailscale), not on the open internet.
+
+1. Make a folder for it, with a `data` folder inside, and save this as `docker-compose.yml` there:
+   ```yaml
+   services:
+     cooking-planner:
+       image: ghcr.io/nick-a-louse/cooking-planner:latest
+       restart: unless-stopped
+       user: "1000:1000"        # your user and group ids (run `id -u` and `id -g`)
+       environment:
+         TZ: Europe/London      # your time zone
+       ports:
+         - "3005:8000"          # change 3005 if that port is taken
+       volumes:
+         - ./data:/data         # the database lives here
+   ```
+2. Start it:
+   ```bash
+   docker compose up -d
+   ```
+3. Open http://localhost:3005, or http://&lt;that machine's address&gt;:3005 from another device.
+
+To build the image from source instead of pulling it, clone this repo and run `docker build -t cooking-planner .`, then use `image: cooking-planner` in the compose file.
+
+The `data` folder must be writable by the user in `user:`. Without a `user:` line the container runs as 1003:1006.
+
+### Worked example: my home server
+
+This is how it runs on my server: the compose file in this repo, an `.env` beside it, and the data in `/opt/appdata`.
 
 1. Make the folders, owned by the container user (1003:1006):
    ```bash
@@ -19,7 +53,7 @@ Big meals need several dishes, each with several steps, to finish at the same mo
    cd /srv/cooking-planner
    sudo install -m 600 /dev/null .env   # then fill it in from .env.example
    ```
-4. Start it :
+4. Start it:
    ```bash
    sudo docker compose pull && sudo docker compose up -d
    sudo docker compose ps     # shows "healthy" after about 20 seconds
@@ -37,7 +71,7 @@ The database schema updates itself on start-up, and the data lives outside the c
 
 - http://your-server:3005 (on your LAN, or over a VPN such as Tailscale)
 
-No login. It's reachable only on the LAN and over Tailscale, not from the internet.
+No login. Mine is reachable only on the LAN and over Tailscale, not from the internet.
 
 ### Backups
 
@@ -94,6 +128,7 @@ Pushing to `master` runs the tests and publishes `ghcr.io/nick-a-louse/cooking-p
 
 ```
 .github/workflows/build.yml   CI: test → build → push to ghcr.io
+docs/screenshot.png           the picture at the top of this README
 Dockerfile                    two-stage image: builds the client, runs the server as 1003:1006
 docker-compose.yml            what runs on the server (/srv/cooking-planner)
 .env.example                  every setting, commented

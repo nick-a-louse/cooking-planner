@@ -9,6 +9,7 @@ const dir = mkdtempSync(join(tmpdir(), "cookplan-"));
 process.env.DB_PATH = join(dir, "app.db"); // db.ts reads this when first imported
 process.env.APP_VERSION = "sha-0123456789abcdef";
 process.env.LOG_LEVEL = "silent";
+process.env.TZ = "Europe/London"; // the container default; the date test depends on it
 
 let app: FastifyInstance;
 
@@ -61,5 +62,64 @@ describe("runtime contract", () => {
     expect((await app.inject("/some/page")).body).toContain("gomez-ui.css");
     expect((await app.inject("/api/nope")).statusCode).toBe(404);
     expect((await app.inject("/static/manifest.webmanifest")).headers["content-type"]).toContain("application/manifest+json");
+  });
+});
+
+describe("plan validation", () => {
+  const newPlan = async (name: string) =>
+    (await app.inject({ method: "POST", url: "/api/plans", payload: { name } })).json();
+  const task = (planId: string, id: string, extra: Record<string, unknown> = {}) => ({
+    id, planId, groupId: null, kind: "task", name: id, startMin: 0, durationMin: 10, color: null,
+    notes: "", sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, ...extra,
+  });
+  const put = (doc: any) => app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: doc });
+
+  it("accepts a valid plan with a group, tasks and a dependency", async () => {
+    const doc = await newPlan("Valid");
+    doc.groups = [{ id: "g1", planId: doc.plan.id, name: "Roast", color: "#a03a3a", sortOrder: 0 }];
+    doc.tasks = [task(doc.plan.id, "a", { groupId: "g1" }), task(doc.plan.id, "b")];
+    doc.deps = [{ planId: doc.plan.id, predecessorId: "a", successorId: "b" }];
+    const r = await put(doc);
+    expect(r.statusCode).toBe(200);
+    expect(r.json().tasks).toHaveLength(2);
+  });
+
+  it.each([
+    ["a missing field", (d: any) => delete d.tasks[0].durationMin, /durationMin/],
+    ["a zero duration", (d: any) => (d.tasks[0].durationMin = 0), /durationMin/],
+    ["an unknown task kind", (d: any) => (d.tasks[0].kind = "boil"), /kind/],
+    ["a bad colour", (d: any) => (d.tasks[0].color = "red"), /color/],
+    ["a bad anchor time", (d: any) => (d.plan.anchorTime = "tomorrow"), /anchorTime/],
+    ["a dependency on a task not in the plan", (d: any) => d.deps.push({ predecessorId: "a", successorId: "zzz" }), /isn't in this plan/],
+    ["a task in a group not in the plan", (d: any) => (d.tasks[0].groupId = "nope"), /group that isn't in this plan/],
+    ["a duplicate task id", (d: any) => d.tasks.push(task(d.plan.id, "a")), /used twice/],
+  ])("rejects %s with a 400 and a clear message", async (_label, breakIt, message) => {
+    const doc = await newPlan(`Invalid ${_label}`);
+    doc.tasks = [task(doc.plan.id, "a")];
+    breakIt(doc);
+    const r = await put(doc);
+    expect(r.statusCode).toBe(400);
+    expect(r.json().error).toMatch(message);
+  });
+
+  it("rejects task ids that belong to another plan, leaving that plan untouched", async () => {
+    const first = await newPlan("Owner");
+    first.tasks = [task(first.plan.id, "owned")];
+    expect((await put(first)).statusCode).toBe(200);
+    const thief = await newPlan("Thief");
+    thief.tasks = [task(thief.plan.id, "owned")];
+    const r = await put(thief);
+    expect(r.statusCode).toBe(400);
+    expect(r.json().error).toMatch(/another plan/);
+    expect((await app.inject(`/api/plans/${first.plan.id}`)).json().tasks).toHaveLength(1);
+  });
+});
+
+describe("default start time", () => {
+  it("uses the local date, not the UTC one, just after midnight in summer time", async () => {
+    const { defaultAnchor } = await import("../routes/plans.js");
+    // 00:30 BST on 15 October is still 14 October in UTC.
+    expect(defaultAnchor(new Date("2026-10-14T23:30:00Z"))).toBe("2026-10-15T18:00");
+    expect(defaultAnchor(new Date("2026-12-25T10:00:00Z"))).toBe("2026-12-25T18:00");
   });
 });

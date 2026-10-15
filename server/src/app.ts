@@ -1,4 +1,4 @@
-import Fastify, { LogController, type FastifyInstance } from "fastify";
+import Fastify, { LogController, type FastifyError, type FastifyInstance } from "fastify";
 import fastifyStatic from "@fastify/static";
 import { existsSync } from "node:fs";
 import { resolve } from "node:path";
@@ -42,6 +42,18 @@ export async function buildApp(opts: { clientDist?: string } = {}): Promise<Fast
   app.addContentTypeParser("application/json", { parseAs: "string" }, (req, body, done) => {
     if ((body as string).trim() === "") return done(null, undefined);
     jsonParser(req, body as string, done);
+  });
+
+  // Every error goes back as { error: "<what's wrong>" }, which is what the client shows.
+  // Fastify's own 4xx errors (e.g. schema validation) would otherwise say only "Bad Request".
+  app.setErrorHandler((err: FastifyError, req, reply) => {
+    const status = err.statusCode && err.statusCode >= 400 ? err.statusCode : 500;
+    if (status >= 500) {
+      req.log.error({ err, url: req.url }, "request failed");
+      return reply.code(status).send({ error: "Something went wrong on the server. Check the container log." });
+    }
+    const message = err.validation ? `Invalid request: ${err.message}` : err.message;
+    return reply.code(status).send({ error: message });
   });
 
   planRoutes(app);

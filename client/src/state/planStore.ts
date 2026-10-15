@@ -23,7 +23,11 @@ interface PlanState {
   createPlan: (name: string) => Promise<void>;
   deletePlan: (id: string) => Promise<void>;
   openPlan: (id: string) => Promise<void>;
-  closePlan: () => void;
+  /**
+   * Save any pending edit, then go back to the plan list. Returns false (and stays on the plan)
+   * if the save failed, unless `discard` is set.
+   */
+  closePlan: (discard?: boolean) => Promise<boolean>;
   /** Apply a local mutation to the open doc and schedule a debounced save. */
   updateDoc: (mutate: (doc: PlanDoc) => PlanDoc) => void;
   /** Snapshot the currently open plan as a reusable template. */
@@ -33,6 +37,8 @@ interface PlanState {
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
+/** The save request currently in flight, so closing can wait for it. */
+let inFlight: Promise<void> | null = null;
 
 export const usePlanStore = create<PlanState>((set, get) => ({
   plans: [],
@@ -82,13 +88,22 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     }
   },
 
-  closePlan: () => {
+  closePlan: async (discard = false) => {
+    // Don't drop an edit made in the last moment: save it now instead of waiting for the timer.
     if (saveTimer) {
       clearTimeout(saveTimer);
       saveTimer = null;
+      await saveNow();
+    } else if (inFlight) {
+      await inFlight;
     }
-    set({ doc: null });
+    if (get().saveState === "error" && !discard) {
+      await saveNow(); // one more try: the server may be back
+      if (get().saveState === "error") return false;
+    }
+    set({ doc: null, saveState: "saved" });
     void get().loadPlans();
+    return true;
   },
 
   saveAsTemplate: async (name) => {
@@ -118,16 +133,40 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     const next = normalize(mutate(doc));
     set({ doc: next, saveState: "saving" });
     if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(async () => {
+    saveTimer = setTimeout(() => {
       saveTimer = null;
-      const latest = get().doc;
-      if (!latest) return;
-      try {
-        const saved = await api.savePlan(latest);
-        set({ saveState: "saved", lastSavedAt: saved.plan.updatedAt, error: null });
-      } catch (e) {
-        set({ saveState: "error", error: (e as Error).message });
-      }
+      void saveNow();
     }, 750);
   },
 }));
+
+/** Save the open plan straight away (after any save already in flight). */
+async function saveNow(): Promise<void> {
+  if (inFlight) await inFlight;
+  const latest = usePlanStore.getState().doc;
+  if (!latest) return;
+  const run = (async () => {
+    try {
+      const saved = await api.savePlan(latest);
+      // Only mark it saved if nothing changed while the request was out.
+      if (!saveTimer && usePlanStore.getState().doc === latest) {
+        usePlanStore.setState({ saveState: "saved", lastSavedAt: saved.plan.updatedAt, error: null });
+      } else {
+        usePlanStore.setState({ lastSavedAt: saved.plan.updatedAt });
+      }
+    } catch (e) {
+      usePlanStore.setState({ saveState: "error", error: (e as Error).message });
+    }
+  })();
+  inFlight = run;
+  try {
+    await run;
+  } finally {
+    if (inFlight === run) inFlight = null;
+  }
+}
+
+/** True while an edit hasn't reached the server yet (drives the "Leave site?" warning). */
+export function hasUnsavedChanges(): boolean {
+  return saveTimer !== null || inFlight !== null || usePlanStore.getState().saveState === "error";
+}
