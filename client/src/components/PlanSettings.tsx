@@ -2,6 +2,7 @@ import { useState } from "react";
 import type { Plan, PlanMode } from "@cookplan/shared";
 import { ALERT_LEAD_OPTIONS, MAX_HOB_RINGS, MAX_OVENS } from "@cookplan/shared";
 import Modal from "./Modal";
+import WholeNumberInput from "./WholeNumberInput";
 import { planNameTaken } from "./PlanList";
 import { usePlanStore } from "../state/planStore";
 
@@ -78,27 +79,15 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
         <div className="field-row">
           <label>
             Ovens
-            <input
-              type="number"
-              min={0}
-              max={MAX_OVENS}
-              value={ovens}
-              onChange={(e) => setOvens(clampInt(e.target.value, MAX_OVENS))}
-            />
+            <WholeNumberInput min={0} max={MAX_OVENS} value={ovens} onChange={setOvens} />
           </label>
           <label>
             Hob rings
-            <input
-              type="number"
-              min={0}
-              max={MAX_HOB_RINGS}
-              value={hobRings}
-              onChange={(e) => setHobRings(clampInt(e.target.value, MAX_HOB_RINGS))}
-            />
+            <WholeNumberInput min={0} max={MAX_HOB_RINGS} value={hobRings} onChange={setHobRings} />
           </label>
           <label>
             Cooks
-            <input type="number" min={1} max={10} value={cooks} onChange={(e) => setCooks(clampInt(e.target.value, 10))} />
+            <WholeNumberInput min={1} max={10} value={cooks} onChange={setCooks} />
           </label>
         </div>
         <p className="muted small">
@@ -141,10 +130,4 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
       </form>
     </Modal>
   );
-}
-
-/** A whole number from 0 to max, from a number box (empty counts as 0). */
-export function clampInt(value: string, max: number): number {
-  const n = Math.round(Number(value));
-  return Number.isFinite(n) ? Math.min(max, Math.max(0, n)) : 0;
 }

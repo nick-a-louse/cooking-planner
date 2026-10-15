@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { MAX_HOB_RINGS, MAX_OVENS } from "@cookplan/shared";
 import Modal from "./Modal";
-import { clampInt } from "./PlanSettings";
+import WholeNumberInput from "./WholeNumberInput";
 import { api } from "../api/client";
 
 /** "My kitchen": the ovens and hob rings each new plan starts with. */
@@ -43,25 +43,23 @@ export default function KitchenSettings({ onClose }: { onClose: () => void }) {
         <div className="field-row">
           <label>
             Ovens
-            <input
-              type="number"
+            <WholeNumberInput
               min={0}
               max={MAX_OVENS}
-              value={ovens ?? ""}
+              value={ovens ?? 0}
               disabled={ovens === null}
-              onChange={(e) => setOvens(clampInt(e.target.value, MAX_OVENS))}
+              onChange={setOvens}
               autoFocus
             />
           </label>
           <label>
             Hob rings
-            <input
-              type="number"
+            <WholeNumberInput
               min={0}
               max={MAX_HOB_RINGS}
               value={hobRings}
               disabled={ovens === null}
-              onChange={(e) => setHobRings(clampInt(e.target.value, MAX_HOB_RINGS))}
+              onChange={setHobRings}
             />
           </label>
         </div>
