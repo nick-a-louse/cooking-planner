@@ -802,17 +802,10 @@ button.rail-cell:hover .drag-grip {
 
 /* Live alerts: banners across the top of the screen until dismissed */
 .live-alerts {
-  position: fixed;
-  top: 12px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: min(560px, calc(100vw - 32px));
   display: flex;
   flex-direction: column;
   gap: 8px;
-  z-index: 90;
-  max-height: calc(100vh - 24px);
-  overflow-y: auto;
+  margin-bottom: 8px;
 }
 .live-alert {
   display: flex;
@@ -824,7 +817,7 @@ button.rail-cell:hover .drag-grip {
   border-left: 8px solid var(--faint);
   border-radius: var(--radius);
   padding: 10px 8px 10px 14px;
-  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+  box-shadow: none;
 }
 .live-alert-text {
   display: flex;
@@ -1256,4 +1249,57 @@ a.btn {
 }
 .task-cell-draggable:active {
   cursor: grabbing;
+}
+
+/* Big button that stops a ringing alarm (the banners stay) */
+.live-alerts-silence {
+  font: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  min-height: 60px;
+  width: 100%;
+  border-radius: var(--radius);
+  border: 0;
+  background: var(--bad);
+  color: #fff;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.25);
+  cursor: pointer;
+  animation: silence-pulse 1.4s ease-in-out infinite;
+}
+:root[data-theme="dark"] .live-alerts-silence {
+  color: #111212;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) .live-alerts-silence {
+    color: #111212;
+  }
+}
+/* Brightness only: a button that changes size is harder to hit with a quick tap */
+@keyframes silence-pulse {
+  50% {
+    filter: brightness(1.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-alerts-silence {
+    animation: none;
+  }
+}
+
+/* Keeps the screen on over plain HTTP (see useKeepAwake): fills the window so the browser
+   counts it as on screen, but transparent, behind everything and never clickable. */
+.keep-awake-video {
+  position: fixed;
+  inset: 0;
+  width: 100vw;
+  height: 100vh;
+  object-fit: cover;
+  opacity: 0;
+  pointer-events: none;
+  z-index: -1;
+}
+@media print {
+  .keep-awake-video {
+    display: none;
+  }
 }

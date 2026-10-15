@@ -468,6 +468,12 @@ export default function App() {
         )}
       </div>
 
+      {/* Live alerts sit in the page under the toolbar, so they never cover its buttons. */}
+      {isLive && liveZeroAt && (
+        <div className="wrap">
+          <LiveAlerts doc={doc} liveZeroAt={liveZeroAt} muted={muted} />
+        </div>
+      )}
       {kitchen && liveZeroAt && (
         <div className="wrap kitchen-wrap">
           <KitchenView
@@ -565,7 +571,6 @@ export default function App() {
       )}
 
       <PrintView doc={doc} />
-      {isLive && liveZeroAt && <LiveAlerts doc={doc} liveZeroAt={liveZeroAt} muted={muted} />}
       {leaveUnsaved && (
         <ConfirmDialog
           title="Your last change wasn't saved"
