@@ -30,6 +30,7 @@ import PlanWarnings from "./components/PlanWarnings";
 import PrintView from "./components/PrintView";
 import { useLiveView } from "./hooks/useLiveView";
 import { chime } from "./utils/chime";
+import { newId } from "./utils/newId";
 import { useKeepAwake } from "./hooks/useKeepAwake";
 import { useMuted } from "./hooks/useMuted";
 import { hasUnsavedChanges, usePlanStore } from "./state/planStore";
@@ -142,7 +143,7 @@ export default function App() {
   const editingGroup = doc.groups.find((g) => g.id === editingGroupId) ?? null;
 
   const addTask = (kind: Task["kind"] = "task", groupId: string | null = null) => {
-    const id = crypto.randomUUID();
+    const id = newId();
     updateDoc((d) => ({
       ...d,
       tasks: [
@@ -171,7 +172,7 @@ export default function App() {
   };
 
   const addGroup = () => {
-    const id = crypto.randomUUID();
+    const id = newId();
     updateDoc((d) => ({
       ...d,
       groups: [
