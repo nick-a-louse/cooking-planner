@@ -1,6 +1,6 @@
 import { create } from "zustand";
-import type { PlanDoc, PlanSummary } from "@cookplan/shared";
-import { reflow, sanitizeDeps } from "@cookplan/shared";
+import type { History, PlanDoc, PlanSummary } from "@cookplan/shared";
+import { emptyHistory, record, redo, reflow, sanitizeDeps, undo } from "@cookplan/shared";
 import { api, ApiError } from "../api/client";
 
 /** Enforce engine invariants: valid acyclic deps, dependent starts derived. */
@@ -20,6 +20,8 @@ interface PlanState {
   error: string | null;
   /** A one-off message about something that happened elsewhere, e.g. another device's change. */
   notice: string | null;
+  /** Undo/redo for planning edits (draft plans only; live-run ticks aren't recorded). */
+  history: History<PlanDoc>;
 
   loadPlans: () => Promise<void>;
   createPlan: (name: string) => Promise<void>;
@@ -37,6 +39,8 @@ interface PlanState {
   /** Clone a template into a fresh plan with a new name/anchor and open it. */
   useTemplate: (templateId: string, name: string, anchorTime: string) => Promise<void>;
   clearNotice: () => void;
+  undo: () => void;
+  redo: () => void;
 }
 
 let saveTimer: ReturnType<typeof setTimeout> | null = null;
@@ -52,6 +56,7 @@ export const usePlanStore = create<PlanState>((set, get) => ({
   lastSavedAt: null,
   error: null,
   notice: null,
+  history: emptyHistory(),
 
   loadPlans: async () => {
     set({ plansLoading: true, error: null });
@@ -133,16 +138,41 @@ export const usePlanStore = create<PlanState>((set, get) => ({
     const doc = get().doc;
     if (!doc) return;
     const next = normalize(mutate(doc));
-    set({ doc: next, saveState: "saving" });
-    if (saveTimer) clearTimeout(saveTimer);
-    saveTimer = setTimeout(() => {
-      saveTimer = null;
-      void saveNow();
-    }, 750);
+    // Only planning edits go in the undo history: not live-run ticks, nor starting a run.
+    if (doc.plan.status === "draft" && next.plan.status === "draft") set({ history: record(get().history, doc) });
+    commit(next);
   },
 
   clearNotice: () => set({ notice: null }),
+
+  undo: () => step(undo),
+  redo: () => step(redo),
 }));
+
+/** Show a new version of the open plan and save it after a short pause (edits in a burst share one save). */
+function commit(next: PlanDoc): void {
+  usePlanStore.setState({ doc: next, saveState: "saving" });
+  if (saveTimer) clearTimeout(saveTimer);
+  saveTimer = setTimeout(() => {
+    saveTimer = null;
+    void saveNow();
+  }, 750);
+}
+
+/** Undo or redo one planning edit. */
+function step(move: typeof undo): void {
+  const { doc, history } = usePlanStore.getState();
+  if (!doc || doc.plan.status !== "draft") return;
+  const result = move(history, doc);
+  if (!result) return;
+  // The snapshot's content, but the current revision, so the save isn't mistaken for a stale copy.
+  const restored = {
+    ...result.value,
+    plan: { ...result.value.plan, revision: doc.plan.revision, updatedAt: doc.plan.updatedAt },
+  };
+  usePlanStore.setState({ history: result.history });
+  commit(normalize(restored));
+}
 
 /** Show a plan freshly loaded from the server, and start listening for other devices' changes. */
 function showDoc(doc: PlanDoc): void {
@@ -152,6 +182,7 @@ function showDoc(doc: PlanDoc): void {
     saveState: "saved",
     lastSavedAt: doc.plan.updatedAt,
     error: null,
+    history: emptyHistory(),
   });
   listen(doc.plan.id);
 }
@@ -161,7 +192,7 @@ function leavePlan(): void {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = null;
   stopListening();
-  usePlanStore.setState({ doc: null, saveState: "saved" });
+  usePlanStore.setState({ doc: null, saveState: "saved", history: emptyHistory() });
 }
 
 /** Save the open plan straight away (after any save already in flight). */
@@ -194,6 +225,7 @@ async function saveNow(): Promise<void> {
           saveState: "saved",
           lastSavedAt: theirs.plan.updatedAt,
           error: null,
+          history: emptyHistory(), // the snapshots no longer match what's on screen
           notice: "This plan was changed on another device at the same time, so your last change wasn't saved. You're now seeing the latest version.",
         });
       } else {
@@ -267,7 +299,8 @@ function receive(remote: PlanDoc): void {
     pendingRemote = remote; // decide once our save has finished
     return;
   }
-  usePlanStore.setState({ doc: normalize(remote), lastSavedAt: remote.plan.updatedAt });
+  // Someone else changed the plan: the undo history would undo their change too, so start afresh.
+  usePlanStore.setState({ doc: normalize(remote), lastSavedAt: remote.plan.updatedAt, history: emptyHistory() });
 }
 
 function applyPendingRemote(): void {

@@ -6,3 +6,4 @@ export * from "./engine/reflow.js";
 export * from "./engine/live.js";
 export * from "./version.js";
 export * from "./engine/alerts.js";
+export * from "./history.js";

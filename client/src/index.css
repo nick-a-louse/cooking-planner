@@ -1009,3 +1009,15 @@ button.rail-cell:hover .drag-grip {
   border-width: 2px;
   border-color: var(--ink);
 }
+.toolbar button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.toolbar button:disabled:hover {
+  border-color: var(--line-strong);
+}
+.toolbar button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
