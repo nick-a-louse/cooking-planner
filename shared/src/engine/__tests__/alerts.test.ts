@@ -4,7 +4,7 @@ import { alertsBetween } from "../alerts.js";
 
 const task = (id: string, startMin: number, durationMin: number, extra: Partial<Task> = {}): Task => ({
   id, planId: "p", groupId: null, kind: "task", name: id, startMin, durationMin, color: null, notes: "",
-  sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: null, ovenTemp: null, ...extra,
+  sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: null, ovenTemp: null, handsOff: false, ...extra,
 });
 const kinds = (tasks: Task[], from: number, to: number, lead = 5) =>
   alertsBetween(tasks, from, to, lead).map((a) => `${a.kind}:${a.taskId}@${a.atMin}`);

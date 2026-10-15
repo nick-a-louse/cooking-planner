@@ -5,7 +5,7 @@ import { criticalTaskIds, taskSlack } from "../critical.js";
 
 const task = (id: string, startMin: number, durationMin: number): Task => ({
   id, planId: "p", groupId: null, kind: "task", name: id, startMin, durationMin, color: null, notes: "",
-  sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: null, ovenTemp: null,
+  sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: null, ovenTemp: null, handsOff: false,
 });
 const dep = (a: string, b: string): Dep => ({ planId: "p", predecessorId: a, successorId: b });
 

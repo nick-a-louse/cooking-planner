@@ -1073,3 +1073,12 @@ button.rail-cell:hover .drag-grip {
 .task-bar-dim {
   opacity: 0.3;
 }
+/* Hands-on overlap: amber, dashed, so it reads differently from a red kitchen clash */
+.task-bar-busy {
+  outline: 3px dashed var(--warn);
+  outline-offset: 1px;
+}
+.task-bar-busy.task-bar-clash {
+  outline-style: solid;
+  outline-color: var(--bad);
+}

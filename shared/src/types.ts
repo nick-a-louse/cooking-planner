@@ -18,6 +18,8 @@ export interface Plan {
   /** This plan's kitchen, for clash warnings. Copied from "My kitchen" when the plan is created. */
   ovens: number;
   hobRings: number;
+  /** How many people are cooking, for hands-on overlap warnings. */
+  cooks: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -54,6 +56,8 @@ export interface Task {
   equipment: string | null;
   /** Oven temperature in °C, when the task uses an oven. */
   ovenTemp: number | null;
+  /** Doesn't need anyone's attention while it runs (e.g. roasting). Wait tasks are always hands-off. */
+  handsOff: boolean;
 }
 
 /** Finish-to-start dependency: successor starts after predecessor ends. */

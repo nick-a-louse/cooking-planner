@@ -47,6 +47,7 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
   const [kind, setKind] = useState(task.kind);
   const [predIds, setPredIds] = useState<string[]>(predecessorsOf(task.id, doc.deps));
   const [equipment, setEquipment] = useState(task.equipment ?? "");
+  const [handsOff, setHandsOff] = useState(task.handsOff);
   const [ovenTemp, setOvenTemp] = useState(task.ovenTemp?.toString() ?? "");
   const isOven = equipment.startsWith("oven-");
   // Offer the plan's ovens, plus this task's own if the plan has since lost it, so it isn't silently cleared.
@@ -78,6 +79,7 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
               color: grouped ? null : color,
               notes,
               equipment: equipment || null,
+              handsOff: kind === "wait" ? false : handsOff,
               ovenTemp: isOven && ovenTemp.trim() !== "" ? Math.min(350, Math.max(0, Math.round(Number(ovenTemp)) || 0)) : null,
             },
             predIds,
@@ -195,6 +197,12 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
           />
           Wait (a pause, e.g. resting or marinating)
         </label>
+        {kind !== "wait" && (
+          <label className="pred-option">
+            <input type="checkbox" checked={handsOff} onChange={(e) => setHandsOff(e.target.checked)} />
+            Hands-off (doesn't need anyone while it runs, e.g. roasting)
+          </label>
+        )}
         <label>
           Notes
           <textarea

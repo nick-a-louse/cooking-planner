@@ -70,7 +70,7 @@ describe("plan validation", () => {
     (await app.inject({ method: "POST", url: "/api/plans", payload: { name } })).json();
   const task = (planId: string, id: string, extra: Record<string, unknown> = {}) => ({
     id, planId, groupId: null, kind: "task", name: id, startMin: 0, durationMin: 10, color: null,
-    notes: "", sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: null, ovenTemp: null, ...extra,
+    notes: "", sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: null, ovenTemp: null, handsOff: false, ...extra,
   });
   const put = (doc: any) => app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: doc });
 
@@ -222,5 +222,20 @@ describe("kitchen and equipment", () => {
     const bad = r.json();
     bad.tasks[0].equipment = "grill";
     expect((await app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: bad })).statusCode).toBe(400);
+  });
+});
+
+describe("hands-on", () => {
+  it("saves cooks and hands-off, and copies keep them", async () => {
+    const doc = (await app.inject({ method: "POST", url: "/api/plans", payload: { name: "Hands" } })).json();
+    expect(doc.plan.cooks).toBe(1);
+    doc.plan.cooks = 2;
+    doc.tasks = [{ id: "h1", planId: doc.plan.id, groupId: null, kind: "task", name: "Roast", startMin: 0, durationMin: 60, color: null, notes: "", sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: null, ovenTemp: null, handsOff: true }];
+    const saved = (await app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: doc })).json();
+    expect(saved.plan.cooks).toBe(2);
+    expect(saved.tasks[0].handsOff).toBe(true);
+    const clone = (await app.inject({ method: "POST", url: `/api/plans/${doc.plan.id}/clone`, payload: { name: "Hands 2" } })).json();
+    expect(clone.plan.cooks).toBe(2);
+    expect(clone.tasks[0].handsOff).toBe(true);
   });
 });

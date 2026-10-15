@@ -1,15 +1,22 @@
-import type { Clash, PlanDoc, Task } from "@cookplan/shared";
+import type { Clash, Overload, PlanDoc, Task } from "@cookplan/shared";
 import { formatHM, ovenLabel, planEndMin, wallClock } from "@cookplan/shared";
 
 interface Props {
   doc: PlanDoc;
   clashes: Clash[];
+  /** Stretches with more hands-on tasks than cooks. */
+  busy: Overload[];
   onOpenTask: (task: Task) => void;
 }
 
-/** The kitchen clashes in a plan, under the toolbar. Warnings only: the plan still saves and runs. */
-export default function ClashList({ doc, clashes, onOpenTask }: Props) {
-  if (clashes.length === 0) return null;
+/** Planning warnings under the toolbar: kitchen clashes and hands-on overlaps. The plan still saves and runs. */
+export default function PlanWarnings({ doc, clashes, busy, onOpenTask }: Props) {
+  const total = clashes.length + busy.length;
+  if (total === 0) return null;
+  const parts = [
+    clashes.length > 0 && (clashes.length === 1 ? "1 kitchen clash" : `${clashes.length} kitchen clashes`),
+    busy.length > 0 && (busy.length === 1 ? "1 hands-on overlap" : `${busy.length} hands-on overlaps`),
+  ].filter(Boolean);
   const endMin = planEndMin(doc.tasks);
   const at = (m: number) => formatHM(wallClock(m, doc.plan.mode, doc.plan.anchorTime, endMin));
   const byId = new Map(doc.tasks.map((t) => [t.id, t]));
@@ -30,9 +37,9 @@ export default function ClashList({ doc, clashes, onOpenTask }: Props) {
     ));
 
   return (
-    <details className="clash-panel" open={clashes.length <= 3}>
+    <details className="clash-panel" open={total <= 3}>
       <summary>
-        {clashes.length === 1 ? "1 kitchen clash" : `${clashes.length} kitchen clashes`}
+        {parts.join(", ")}
         <span className="muted small"> · the plan still works, but check these</span>
       </summary>
       <ul>
@@ -56,6 +63,15 @@ export default function ClashList({ doc, clashes, onOpenTask }: Props) {
                 {doc.plan.ovens === 1 ? "1 oven" : `${doc.plan.ovens} ovens`}
               </>
             )}
+          </li>
+        ))}
+        {busy.map((o, i) => (
+          <li key={`busy-${i}`}>
+            <strong>
+              Hands-on, {at(o.fromMin)}–{at(o.toMin)}:
+            </strong>{" "}
+            {o.count} tasks need someone at once, with {doc.plan.cooks === 1 ? "1 cook" : `${doc.plan.cooks} cooks`} (
+            {list(o.taskIds)})
           </li>
         ))}
       </ul>
