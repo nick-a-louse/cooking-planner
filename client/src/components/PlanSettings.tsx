@@ -1,5 +1,6 @@
 import { useState } from "react";
 import type { Plan, PlanMode } from "@cookplan/shared";
+import { ALERT_LEAD_OPTIONS } from "@cookplan/shared";
 import Modal from "./Modal";
 import { planNameTaken } from "./PlanList";
 import { usePlanStore } from "../state/planStore";
@@ -17,6 +18,7 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
   const [name, setName] = useState(plan.name);
   const [mode, setMode] = useState<PlanMode>(plan.mode);
   const [anchorTime, setAnchorTime] = useState(plan.anchorTime);
+  const [alertLeadMin, setAlertLeadMin] = useState(plan.alertLeadMin);
   const plans = usePlanStore((s) => s.plans);
   const taken = planNameTaken(plans, name, plan.id);
 
@@ -27,7 +29,7 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
         onSubmit={(e) => {
           e.preventDefault();
           if (taken) return;
-          onSave({ ...plan, name: name.trim() || plan.name, mode, anchorTime });
+          onSave({ ...plan, name: name.trim() || plan.name, mode, anchorTime, alertLeadMin });
         }}
       >
         <label>
@@ -70,6 +72,22 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
             The last task ends exactly at this time — every task's start is worked out backward from it.
           </p>
         )}
+        <div className="field">
+          <span id="lead-label">Warning before each task starts (live run)</span>
+          <div className="seg" role="radiogroup" aria-labelledby="lead-label">
+            {ALERT_LEAD_OPTIONS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                role="radio"
+                aria-checked={alertLeadMin === m}
+                onClick={() => setAlertLeadMin(m)}
+              >
+                {m} min
+              </button>
+            ))}
+          </div>
+        </div>
         <div className="editor-actions">
           <button type="button" onClick={onSaveAsTemplate}>
             Save as template

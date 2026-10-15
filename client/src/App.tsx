@@ -20,7 +20,10 @@ import ConfirmDialog from "./components/ConfirmDialog";
 import StartDialog from "./components/Live/StartDialog";
 import LiveTaskPanel from "./components/Live/LiveTaskPanel";
 import { useNow } from "./hooks/useNow";
+import LiveAlerts from "./components/Live/LiveAlerts";
 import { chime } from "./utils/chime";
+import { useKeepAwake } from "./hooks/useKeepAwake";
+import { useMuted } from "./hooks/useMuted";
 import { hasUnsavedChanges, usePlanStore } from "./state/planStore";
 
 export default function App() {
@@ -36,7 +39,6 @@ export default function App() {
   const [liveTaskId, setLiveTaskId] = useState<string | null>(null);
   const [leaveUnsaved, setLeaveUnsaved] = useState(false);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const notifiedRef = useRef<Set<string>>(new Set());
   const now = useNow();
 
   const isLive = doc?.plan.status === "live" && !!doc.plan.liveStartedAt;
@@ -75,21 +77,9 @@ export default function App() {
     return () => window.removeEventListener("beforeunload", warn);
   }, []);
 
-  // Live reminders: chime + toast when a pending task starts within ~2 minutes.
-  useEffect(() => {
-    if (!doc || !isLive || nowMin === null || !liveZeroAt) return;
-    for (const t of doc.tasks) {
-      if (t.status !== "pending" || notifiedRef.current.has(t.id)) continue;
-      const inMin = t.startMin - nowMin;
-      if (inMin > 0 && inMin <= 2) {
-        notifiedRef.current.add(t.id);
-        chime();
-        setToast(`Coming up: "${t.name}" at ${formatHM(liveWallClock(t.startMin, liveZeroAt))}`);
-        if (toastTimer.current) clearTimeout(toastTimer.current);
-        toastTimer.current = setTimeout(() => setToast(null), 6000);
-      }
-    }
-  }, [doc, isLive, nowMin, liveZeroAt]);
+  // Live run: keep the screen on, and alert (sound + banner) at each task's moments.
+  useKeepAwake(isLive);
+  const [muted, toggleMuted] = useMuted();
 
   if (!doc) return <PlanList />;
 
@@ -217,13 +207,12 @@ export default function App() {
   };
 
   const startRun = (liveZeroAtIso: string) => {
-    notifiedRef.current.clear();
     updateDoc((d) => ({
       ...d,
       plan: { ...d.plan, status: "live", liveStartedAt: liveZeroAtIso },
     }));
     setStartDialogOpen(false);
-    chime();
+    if (!muted) chime(); // also unlocks sound on phones, which need a tap first
     showToast("Cooking started — tap a task to see notes or mark it done");
   };
 
@@ -233,7 +222,6 @@ export default function App() {
   };
 
   const resetRun = () => {
-    notifiedRef.current.clear();
     updateDoc((d) => ({
       ...d,
       plan: { ...d.plan, status: "draft", liveStartedAt: null },
@@ -370,6 +358,9 @@ export default function App() {
               })()}
             </span>
             <span className="spacer" />
+            <button onClick={toggleMuted} aria-pressed={muted} title={muted ? "Alert sounds are off on this device" : "Alert sounds are on"}>
+              {muted ? "Sound off" : "Sound on"}
+            </button>
             <button onClick={endRun}>End run</button>
           </>
         )}
@@ -447,6 +438,7 @@ export default function App() {
         />
       )}
 
+      {isLive && liveZeroAt && <LiveAlerts doc={doc} liveZeroAt={liveZeroAt} muted={muted} />}
       {leaveUnsaved && (
         <ConfirmDialog
           title="Your last change wasn't saved"
