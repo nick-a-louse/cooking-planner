@@ -101,6 +101,18 @@ export const clonePlanSchema = {
   },
 } as const;
 
+/** A file made by export: one or more plan documents. */
+export const importSchema = {
+  type: "object",
+  required: ["format", "version", "plans"],
+  properties: {
+    format: { const: "cooking-planner" },
+    version: { const: 1 },
+    exportedAt: { type: "string" },
+    plans: { type: "array", minItems: 1, maxItems: 500, items: planDocSchema },
+  },
+} as const;
+
 /** "My kitchen": the default equipment copied into each new plan. */
 export const kitchenSchema = {
   type: "object",

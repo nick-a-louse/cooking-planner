@@ -36,6 +36,14 @@ export const api = {
   deletePlan: (id: string) => request<void>(`/api/plans/${id}`, { method: "DELETE" }),
   getKitchen: () => request<Kitchen>("/api/settings/kitchen"),
   saveKitchen: (k: Kitchen) => request<Kitchen>("/api/settings/kitchen", { method: "PUT", body: JSON.stringify(k) }),
+  /** Download links: the server sends these as file attachments. */
+  exportUrl: (id: string) => `/api/plans/${id}/export`,
+  exportAllUrl: "/api/export",
+  importPlans: (file: unknown) =>
+    request<{ imported: { id: string; name: string; isTemplate: boolean }[] }>("/api/import", {
+      method: "POST",
+      body: JSON.stringify(file),
+    }),
   clonePlan: (id: string, opts: { name?: string; asTemplate?: boolean; anchorTime?: string } = {}) =>
     request<PlanDoc>(`/api/plans/${id}/clone`, { method: "POST", body: JSON.stringify(opts) }),
 };

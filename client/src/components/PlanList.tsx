@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { PlanSummary } from "@cookplan/shared";
 import Modal from "./Modal";
 import AppHeader from "./AppHeader";
@@ -6,6 +6,7 @@ import AppFooter from "./AppFooter";
 import KitchenSettings from "./KitchenSettings";
 import ConfirmDialog from "./ConfirmDialog";
 import { usePlanStore } from "../state/planStore";
+import { api } from "../api/client";
 
 /** Case-insensitive, trimmed name collision check against loaded plans. */
 export function planNameTaken(plans: PlanSummary[], name: string, excludeId?: string): boolean {
@@ -130,6 +131,9 @@ export default function PlanList() {
                 {p.anchorTime.replace("T", " ")} · {p.status}
               </span>
             </button>
+            <a className="plan-delete plan-export" href={api.exportUrl(p.id)} download title="Export to a file" aria-label={`Export ${p.name}`}>
+              <DownloadIcon />
+            </a>
             <button className="plan-delete" title="Delete plan" aria-label={`Delete ${p.name}`} onClick={() => setDeleting(p)}>
               <CrossIcon />
             </button>
@@ -149,6 +153,9 @@ export default function PlanList() {
                     {t.mode === "backward" ? "Backward" : "Forward"} plan — tap to use
                   </span>
                 </button>
+                <a className="plan-delete plan-export" href={api.exportUrl(t.id)} download title="Export to a file to share" aria-label={`Export ${t.name}`}>
+                  <DownloadIcon />
+                </a>
                 <button className="plan-delete" title="Delete template" aria-label={`Delete ${t.name}`} onClick={() => setDeleting(t)}>
                   <CrossIcon />
                 </button>
@@ -157,6 +164,8 @@ export default function PlanList() {
           </ul>
         </>
       )}
+
+      <ShareAndBackUp hasPlans={plans.length > 0} />
 
       {usingTemplate && (
         <UseTemplateDialog template={usingTemplate} onClose={() => setUsingTemplate(null)} />
@@ -180,6 +189,77 @@ function CrossIcon() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
       <path d="M6 6l12 12M18 6L6 18" />
+    </svg>
+  );
+}
+
+/** Import a file, or export everything. Importing always adds plans; it never replaces any. */
+function ShareAndBackUp({ hasPlans }: { hasPlans: boolean }) {
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [busy, setBusy] = useState(false);
+
+  const importFile = async (file: File) => {
+    setBusy(true);
+    try {
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(await file.text());
+      } catch {
+        throw new Error(`"${file.name}" isn't a Cooking Planner export (it isn't valid JSON).`);
+      }
+      const { imported } = await api.importPlans(parsed);
+      const names = imported.map((p) => p.name);
+      usePlanStore.setState({
+        error: null,
+        notice:
+          names.length === 1
+            ? `Imported "${names[0]}".`
+            : `Imported ${names.length} plans and templates: ${names.slice(0, 5).join(", ")}${names.length > 5 ? ", …" : ""}.`,
+      });
+      await usePlanStore.getState().loadPlans();
+    } catch (e) {
+      usePlanStore.setState({ notice: null, error: `Import failed: ${(e as Error).message}` });
+    } finally {
+      setBusy(false);
+      if (fileInput.current) fileInput.current.value = ""; // allow picking the same file again
+    }
+  };
+
+  return (
+    <section className="share-backup">
+      <h2 className="section-title">Share and back up</h2>
+      <p className="muted small">
+        Export a plan or template (the arrow on its card) to share with someone else running Cooking Planner, or
+        export everything as a backup. Importing always adds new plans; it never replaces yours.
+      </p>
+      <div className="share-actions">
+        <button type="button" className="btn" disabled={busy} onClick={() => fileInput.current?.click()}>
+          {busy ? "Importing…" : "Import a file"}
+        </button>
+        {hasPlans && (
+          <a className="btn" href={api.exportAllUrl} download>
+            Export all
+          </a>
+        )}
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".json,application/json"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void importFile(f);
+          }}
+        />
+      </div>
+    </section>
+  );
+}
+
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" aria-hidden="true" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 4v11M7 10l5 5 5-5M5 20h14" />
     </svg>
   );
 }
