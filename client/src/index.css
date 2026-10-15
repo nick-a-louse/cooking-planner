@@ -1082,3 +1082,95 @@ button.rail-cell:hover .drag-grip {
   outline-style: solid;
   outline-color: var(--bad);
 }
+
+/* Print: only the print view, black on white whatever the screen theme */
+.print-view {
+  display: none;
+}
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  /* !important: the kit's dark-mode rule is more specific, and its colour scheme would paint the page margins dark */
+  :root {
+    color-scheme: light !important;
+    --bg: #fff !important;
+    --ink: #000 !important;
+  }
+  html,
+  body {
+    background: #fff !important;
+    color: #000;
+  }
+  .plan-view > :not(.print-view),
+  .live-alerts,
+  .toast,
+  .modal-overlay {
+    display: none !important;
+  }
+  .print-view {
+    display: block;
+    font-size: 11pt;
+  }
+  .print-break {
+    break-before: page;
+  }
+  .print-title {
+    font-size: 20pt;
+    font-weight: 700;
+  }
+  .print-sub {
+    margin: 2pt 0 10pt;
+    color: #333;
+  }
+  .print-heading {
+    font-size: 15pt;
+    font-weight: 700;
+    margin-bottom: 6pt;
+  }
+  .print-timeline {
+    width: 100%;
+    height: auto;
+    max-height: 245mm;
+  }
+  .print-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 10pt;
+  }
+  .print-table th {
+    color: #333;
+    border-bottom: 1pt solid #000;
+    font-size: 9pt;
+    padding: 3pt 5pt;
+  }
+  .print-table td {
+    border-bottom: 0.5pt solid #bbb;
+    padding: 4pt 5pt;
+    vertical-align: top;
+  }
+  .print-table tr {
+    break-inside: avoid;
+  }
+  .print-table .num {
+    width: 13mm;
+    font-variant-numeric: tabular-nums;
+  }
+  .print-tick {
+    width: 7mm;
+  }
+  .print-box {
+    display: inline-block;
+    width: 3.5mm;
+    height: 3.5mm;
+    border: 1pt solid #000;
+  }
+  .print-muted {
+    color: #444;
+    font-weight: 400;
+  }
+  .print-notes {
+    white-space: pre-wrap;
+  }
+}
