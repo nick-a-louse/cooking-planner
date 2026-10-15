@@ -69,29 +69,64 @@ export function equipmentClashes(tasks: Task[], kitchen: Kitchen): Clash[] {
     }
   }
 
-  // Hob: sweep through the start/end points, tracking how many hob tasks run at once.
-  // Consecutive over-capacity stretches are merged into one clash.
-  const hob = active.filter((t) => t.equipment === "hob");
-  const points = [...new Set(hob.flatMap((t) => [t.startMin, end(t)]))].sort((x, y) => x - y);
-  let open: { ids: Set<string>; count: number; fromMin: number; toMin: number } | null = null;
-  for (let k = 0; k < points.length - 1; k++) {
-    const [from, to] = [points[k], points[k + 1]];
-    const running = hob.filter((t) => t.startMin <= from && end(t) >= to);
-    if (running.length > kitchen.hobRings) {
-      if (open && open.toMin === from) {
-        running.forEach((t) => open!.ids.add(t.id));
-        open.count = Math.max(open.count, running.length);
-        open.toMin = to;
-      } else {
-        if (open) clashes.push({ kind: "hob", taskIds: [...open.ids], count: open.count, fromMin: open.fromMin, toMin: open.toMin });
-        open = { ids: new Set(running.map((t) => t.id)), count: running.length, fromMin: from, toMin: to };
-      }
-    }
-  }
-  if (open) clashes.push({ kind: "hob", taskIds: [...open.ids], count: open.count, fromMin: open.fromMin, toMin: open.toMin });
+  // Hob: more pans at once than rings.
+  for (const o of overloads(active.filter((t) => t.equipment === "hob"), kitchen.hobRings)) clashes.push({ kind: "hob", ...o });
 
   const startOf = (c: Clash) => ("fromMin" in c ? c.fromMin : -Infinity);
   return clashes.sort((x, y) => startOf(x) - startOf(y));
+}
+
+export interface Overload {
+  taskIds: string[];
+  /** The most running at once during the stretch. */
+  count: number;
+  fromMin: number;
+  toMin: number;
+}
+
+/**
+ * Stretches of time when more of these tasks run at once than `capacity` allows (hob rings, cooks…).
+ * Sweeps through the start and end points; one continuous over-capacity stretch is reported once.
+ */
+export function overloads(tasks: Task[], capacity: number): Overload[] {
+  const out: Overload[] = [];
+  const points = [...new Set(tasks.flatMap((t) => [t.startMin, end(t)]))].sort((x, y) => x - y);
+  let open: { ids: Set<string>; count: number; fromMin: number; toMin: number } | null = null;
+  const close = () => {
+    if (open) out.push({ taskIds: [...open.ids], count: open.count, fromMin: open.fromMin, toMin: open.toMin });
+    open = null;
+  };
+  for (let k = 0; k < points.length - 1; k++) {
+    const [from, to] = [points[k], points[k + 1]];
+    const running = tasks.filter((t) => t.startMin <= from && end(t) >= to);
+    if (running.length <= capacity) {
+      close();
+      continue;
+    }
+    if (open && open.toMin === from) {
+      running.forEach((t) => open!.ids.add(t.id));
+      open.count = Math.max(open.count, running.length);
+      open.toMin = to;
+    } else {
+      close();
+      open = { ids: new Set(running.map((t) => t.id)), count: running.length, fromMin: from, toMin: to };
+    }
+  }
+  close();
+  return out;
+}
+
+/** Does this task need someone's hands? Waits never do; other tasks unless marked hands-off. */
+export function isHandsOn(task: Task): boolean {
+  return task.kind !== "wait" && !task.handsOff;
+}
+
+/** Stretches when more hands-on tasks overlap than there are cooks. Finished tasks are left out. */
+export function handsOnOverloads(tasks: Task[], cooks: number): Overload[] {
+  return overloads(
+    tasks.filter((t) => t.status !== "done" && isHandsOn(t)),
+    cooks,
+  );
 }
 
 /** Ids of every task involved in at least one clash, for outlining on the timeline. */

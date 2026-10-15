@@ -28,6 +28,7 @@ const plan = {
     alertLeadMin: { enum: [1, 2, 5, 10] },
     ovens: { type: "integer", minimum: 0, maximum: 4 },
     hobRings: { type: "integer", minimum: 0, maximum: 8 },
+    cooks: { type: "integer", minimum: 1, maximum: 10 },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
@@ -61,6 +62,7 @@ const task = {
     actualDoneAt: isoOrNull,
     equipment: { anyOf: [{ type: "string", pattern: "^(hob|oven-[1-4])$" }, { type: "null" }] },
     ovenTemp: { type: ["integer", "null"], minimum: 0, maximum: 350 },
+    handsOff: { type: "boolean" },
   },
 } as const;
 

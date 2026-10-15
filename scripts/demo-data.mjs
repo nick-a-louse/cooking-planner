@@ -7,6 +7,8 @@ const api = async (method, path, body) => {
   return r.status === 204 ? null : r.json();
 };
 const year = new Date().getFullYear();
+// Tasks that don't need anyone while they run (the oven or the fridge does the work).
+const HANDS_OFF = new Set(["Take turkey out of fridge", "Roast turkey", "Roast potatoes", "Steam vegetables"]);
 
 async function makePlan(name, anchorTime, mode, groups, asTemplate = false) {
   // replace an earlier copy, so the script can be re-run
@@ -23,7 +25,8 @@ async function makePlan(name, anchorTime, mode, groups, asTemplate = false) {
       const tid = crypto.randomUUID();
       ids[key] = tid;
       doc.tasks.push({ id: tid, planId: id, groupId: doc.groups[gi].id, kind, name: tname, startMin: start, durationMin: dur,
-        color: null, notes, sortOrder: order++, status: "pending", actualStartAt: null, actualDoneAt: null, equipment, ovenTemp });
+        color: null, notes, sortOrder: order++, status: "pending", actualStartAt: null, actualDoneAt: null, equipment, ovenTemp,
+        handsOff: HANDS_OFF.has(tname) });
       if (after) doc.deps.push({ planId: id, predecessorId: ids[after], successorId: tid });
     }
   });

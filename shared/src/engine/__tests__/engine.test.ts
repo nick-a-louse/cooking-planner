@@ -21,6 +21,7 @@ function task(id: string, startMin: number, durationMin: number): Task {
     actualDoneAt: null,
     equipment: null,
     ovenTemp: null,
+    handsOff: false,
   };
 }
 

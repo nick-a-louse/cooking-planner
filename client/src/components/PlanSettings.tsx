@@ -21,6 +21,7 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
   const [alertLeadMin, setAlertLeadMin] = useState(plan.alertLeadMin);
   const [ovens, setOvens] = useState(plan.ovens);
   const [hobRings, setHobRings] = useState(plan.hobRings);
+  const [cooks, setCooks] = useState(plan.cooks);
   const plans = usePlanStore((s) => s.plans);
   const taken = planNameTaken(plans, name, plan.id);
 
@@ -31,7 +32,7 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
         onSubmit={(e) => {
           e.preventDefault();
           if (taken) return;
-          onSave({ ...plan, name: name.trim() || plan.name, mode, anchorTime, alertLeadMin, ovens, hobRings });
+          onSave({ ...plan, name: name.trim() || plan.name, mode, anchorTime, alertLeadMin, ovens, hobRings, cooks: Math.max(1, cooks) });
         }}
       >
         <label>
@@ -95,8 +96,15 @@ export default function PlanSettings({ plan, onSave, onSaveAsTemplate, onResetRu
               onChange={(e) => setHobRings(clampInt(e.target.value, MAX_HOB_RINGS))}
             />
           </label>
+          <label>
+            Cooks
+            <input type="number" min={1} max={10} value={cooks} onChange={(e) => setCooks(clampInt(e.target.value, 10))} />
+          </label>
         </div>
-        <p className="muted small">This plan's kitchen, used to warn about oven and hob clashes. New plans start from My kitchen on the plan list.</p>
+        <p className="muted small">
+          This plan's kitchen, used to warn about oven and hob clashes, and when more tasks need someone's hands at once than
+          there are cooks. New plans start from My kitchen on the plan list.
+        </p>
         <div className="field">
           <span id="lead-label">Warning before each task starts (live run)</span>
           <div className="seg" role="radiogroup" aria-labelledby="lead-label">

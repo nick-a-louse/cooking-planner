@@ -3,6 +3,7 @@ import type { Group, Plan, Task } from "@cookplan/shared";
 import {
   clashingTaskIds,
   criticalTaskIds,
+  handsOnOverloads,
   currentTaskIds,
   equipmentClashes,
   formatHM,
@@ -25,7 +26,7 @@ import LiveTaskPanel from "./components/Live/LiveTaskPanel";
 import { useNow } from "./hooks/useNow";
 import LiveAlerts from "./components/Live/LiveAlerts";
 import KitchenView from "./components/Live/KitchenView";
-import ClashList from "./components/ClashList";
+import PlanWarnings from "./components/PlanWarnings";
 import { useLiveView } from "./hooks/useLiveView";
 import { chime } from "./utils/chime";
 import { useKeepAwake } from "./hooks/useKeepAwake";
@@ -117,6 +118,9 @@ export default function App() {
     [doc],
   );
   const clashIds = useMemo(() => clashingTaskIds(clashes), [clashes]);
+  // More hands-on tasks at once than cooks (warnings only), shown while planning.
+  const busy = useMemo(() => (doc && doc.plan.status === "draft" ? handsOnOverloads(doc.tasks, doc.plan.cooks) : []), [doc]);
+  const busyIds = useMemo(() => new Set(busy.flatMap((o) => o.taskIds)), [busy]);
 
   // Critical path: off by default; outlines the chain that decides when the meal is ready.
   const [showCritical, setShowCritical] = useState(false);
@@ -158,6 +162,7 @@ export default function App() {
           actualDoneAt: null,
           equipment: null,
           ovenTemp: null,
+          handsOff: false,
         } satisfies Task,
       ],
     }));
@@ -461,9 +466,9 @@ export default function App() {
           />
         </div>
       )}
-      {clashes.length > 0 && (
+      {(clashes.length > 0 || busy.length > 0) && (
         <div className="wrap">
-          <ClashList doc={doc} clashes={clashes} onOpenTask={(t) => setEditingTaskId(t.id)} />
+          <PlanWarnings doc={doc} clashes={clashes} busy={busy} onOpenTask={(t) => setEditingTaskId(t.id)} />
         </div>
       )}
       <div className="wrap timeline-wrap" hidden={kitchen}>
@@ -484,6 +489,7 @@ export default function App() {
         barClass={(t) =>
           [
             clashIds.has(t.id) ? "task-bar-clash" : "",
+            busyIds.has(t.id) ? "task-bar-busy" : "",
             criticalIds ? (criticalIds.has(t.id) ? "task-bar-critical" : "task-bar-dim") : "",
           ].join(" ")
         }

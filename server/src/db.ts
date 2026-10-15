@@ -84,6 +84,9 @@ addColumn("ALTER TABLE plans ADD COLUMN ovens INTEGER NOT NULL DEFAULT 1");
 addColumn("ALTER TABLE plans ADD COLUMN hob_rings INTEGER NOT NULL DEFAULT 4");
 addColumn("ALTER TABLE tasks ADD COLUMN equipment TEXT");
 addColumn("ALTER TABLE tasks ADD COLUMN oven_temp INTEGER");
+// Hands-on warnings: how many cooks, and which tasks don't need anyone.
+addColumn("ALTER TABLE plans ADD COLUMN cooks INTEGER NOT NULL DEFAULT 1");
+addColumn("ALTER TABLE tasks ADD COLUMN hands_off INTEGER NOT NULL DEFAULT 0");
 
 // App-wide settings (e.g. "My kitchen"), one JSON value per key.
 db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");

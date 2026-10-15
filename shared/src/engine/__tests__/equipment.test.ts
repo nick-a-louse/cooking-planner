@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Task } from "../../types.js";
-import { clashingTaskIds, equipmentClashes } from "../equipment.js";
+import { clashingTaskIds, equipmentClashes, handsOnOverloads } from "../equipment.js";
 
 const task = (id: string, startMin: number, durationMin: number, equipment: string | null, ovenTemp: number | null = null, extra: Partial<Task> = {}): Task => ({
   id, planId: "p", groupId: null, kind: "task", name: id, startMin, durationMin, color: null, notes: "",
-  sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment, ovenTemp, ...extra,
+  sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment, ovenTemp, handsOff: false, ...extra,
 });
 const kitchen = { ovens: 2, hobRings: 2 };
 
@@ -51,5 +51,23 @@ describe("equipment clashes", () => {
   it("lists the tasks to outline", () => {
     const c = equipmentClashes([task("a", 0, 60, "oven-1", 180), task("b", 30, 60, "oven-1", 220), task("c", 0, 10, null)], kitchen);
     expect(clashingTaskIds(c)).toEqual(new Set(["a", "b"]));
+  });
+});
+
+describe("hands-on overlaps", () => {
+  it("warns when more hands-on tasks overlap than there are cooks", () => {
+    const tasks = [task("peel", 0, 30, null), task("trim", 20, 20, null), task("roast", 0, 120, "oven-1", 180, { handsOff: true })];
+    expect(handsOnOverloads(tasks, 1)).toEqual([{ taskIds: ["peel", "trim"], count: 2, fromMin: 20, toMin: 30 }]);
+    expect(handsOnOverloads(tasks, 2)).toEqual([]);
+  });
+
+  it("never counts waits, hands-off tasks or finished tasks", () => {
+    const tasks = [
+      task("rest", 0, 30, null, null, { kind: "wait" }),
+      task("simmer", 0, 30, "hob", null, { handsOff: true }),
+      task("done", 0, 30, null, null, { status: "done" }),
+      task("carve", 0, 30, null),
+    ];
+    expect(handsOnOverloads(tasks, 1)).toEqual([]);
   });
 });
