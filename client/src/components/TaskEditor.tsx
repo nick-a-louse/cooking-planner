@@ -13,6 +13,7 @@ import {
   wouldCreateCycle,
 } from "@cookplan/shared";
 import Modal from "./Modal";
+import WholeNumberInput from "./WholeNumberInput";
 import SwatchPicker from "./SwatchPicker";
 
 interface Props {
@@ -143,13 +144,7 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
           </label>
           <label>
             Duration (min)
-            <input
-              type="number"
-              min={1}
-              step={1}
-              value={duration}
-              onChange={(e) => setDuration(Number(e.target.value))}
-            />
+            <WholeNumberInput min={1} max={10000} value={duration} onChange={setDuration} />
           </label>
         </div>
         {hasPreds && <p className="muted small">Start is set automatically — this task begins when its linked task finishes.</p>}
