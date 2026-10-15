@@ -152,7 +152,13 @@ export default function TaskEditor({ doc, task, onSave, onDelete, onClose }: Pro
             />
           </label>
         </div>
-        {hasPreds && <p className="muted small">Start is set automatically — this task begins when its linked task finishes.</p>}
+        {hasPreds && (
+          <p className="muted small">
+            Starts when {predIds.map((id) => doc.tasks.find((t) => t.id === id)?.name ?? "a linked task").join(" and ")}{" "}
+            {predIds.length === 1 ? "finishes" : "finish"}. To set your own start time, untick{" "}
+            {predIds.length === 1 ? "it" : "them"} under <strong>Starts after</strong>.
+          </p>
+        )}
         {candidates.length > 0 && (
           <fieldset className="preds-field">
             <legend className="swatch-label">Starts after</legend>

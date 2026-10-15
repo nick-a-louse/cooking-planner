@@ -271,7 +271,7 @@ export default function App() {
 
   const endRun = () => {
     updateDoc((d) => ({ ...d, plan: { ...d.plan, status: "done" } }));
-    showToast("Run finished");
+    showToast("Run finished. Press Edit plan again to change the plan.");
   };
 
   const resetRun = () => {
@@ -433,7 +433,14 @@ export default function App() {
             <button onClick={endRun}>End run</button>
           </>
         )}
-        {doc.plan.status === "done" && <span className="live-status muted">Run finished</span>}
+        {doc.plan.status === "done" && (
+          <>
+            <span className="live-status muted">Run finished</span>
+            <button onClick={resetRun} title="Clear the ticks and unlock the plan for changes">
+              Edit plan again
+            </button>
+          </>
+        )}
         {!isLive && <span className="spacer" />}
         {!kitchen && (
           <>
