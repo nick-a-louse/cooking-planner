@@ -370,10 +370,50 @@ button.rail-cell:hover {
   z-index: 10;
 }
 
+/* The dragged row stays in place, faded; .drag-chip follows the pointer */
 .row-dragging {
-  opacity: 0.6;
-  z-index: 6;
-  position: relative;
+  opacity: 0.35;
+}
+.drag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 240px;
+  padding: 6px 12px;
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  box-shadow: 0 6px 18px rgb(0 0 0 / 0.2);
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: grabbing;
+}
+/* A group's end, while a task from another group is dragged over it: where it will land */
+.drop-slot .drop-slot-label {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 14px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.drop-slot .drop-slot-hint {
+  position: sticky;
+  left: 8px;
+  display: inline-block;
+  padding: 10px 8px;
+  font-size: 14px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.drop-slot {
+  outline: 2px dashed var(--accent);
+  outline-offset: -3px;
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
 
 .drag-grip {
@@ -1201,4 +1241,19 @@ button.rail-cell:hover .drag-grip {
 }
 a.btn {
   text-decoration: none;
+}
+
+/* A group header a dragged task will join (at the bottom) */
+.group-drop-target .group-cell,
+.group-drop-target .group-track {
+  background: color-mix(in srgb, var(--accent) 16%, var(--surface));
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
+
+/* Task names are the handle for moving rows: say so with the cursor */
+.task-cell-draggable {
+  cursor: grab;
+}
+.task-cell-draggable:active {
+  cursor: grabbing;
 }
