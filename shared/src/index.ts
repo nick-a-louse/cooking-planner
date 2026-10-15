@@ -7,3 +7,4 @@ export * from "./engine/live.js";
 export * from "./version.js";
 export * from "./engine/alerts.js";
 export * from "./history.js";
+export * from "./engine/equipment.js";

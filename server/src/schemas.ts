@@ -26,6 +26,8 @@ const plan = {
     // Optional here so an out-of-date page gets a clear "reload" message rather than a schema error.
     revision: { type: "integer", minimum: 1 },
     alertLeadMin: { enum: [1, 2, 5, 10] },
+    ovens: { type: "integer", minimum: 0, maximum: 4 },
+    hobRings: { type: "integer", minimum: 0, maximum: 8 },
     createdAt: { type: "string" },
     updatedAt: { type: "string" },
   },
@@ -57,6 +59,8 @@ const task = {
     status: { enum: ["pending", "active", "done"] },
     actualStartAt: isoOrNull,
     actualDoneAt: isoOrNull,
+    equipment: { anyOf: [{ type: "string", pattern: "^(hob|oven-[1-4])$" }, { type: "null" }] },
+    ovenTemp: { type: ["integer", "null"], minimum: 0, maximum: 350 },
   },
 } as const;
 
@@ -92,6 +96,16 @@ export const clonePlanSchema = {
     name: { type: "string", maxLength: 200 },
     asTemplate: { type: "boolean" },
     anchorTime: localDateTime,
+  },
+} as const;
+
+/** "My kitchen": the default equipment copied into each new plan. */
+export const kitchenSchema = {
+  type: "object",
+  required: ["ovens", "hobRings"],
+  properties: {
+    ovens: { type: "integer", minimum: 0, maximum: 4 },
+    hobRings: { type: "integer", minimum: 0, maximum: 8 },
   },
 } as const;
 

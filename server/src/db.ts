@@ -79,6 +79,14 @@ function addColumn(sql: string): void {
 addColumn("ALTER TABLE tasks ADD COLUMN kind TEXT NOT NULL DEFAULT 'task'"); // wait tasks
 addColumn("ALTER TABLE plans ADD COLUMN revision INTEGER NOT NULL DEFAULT 1"); // live sync
 addColumn("ALTER TABLE plans ADD COLUMN alert_lead_min INTEGER NOT NULL DEFAULT 5"); // live alerts
+// Equipment clashes: each plan's kitchen, and what each task uses.
+addColumn("ALTER TABLE plans ADD COLUMN ovens INTEGER NOT NULL DEFAULT 1");
+addColumn("ALTER TABLE plans ADD COLUMN hob_rings INTEGER NOT NULL DEFAULT 4");
+addColumn("ALTER TABLE tasks ADD COLUMN equipment TEXT");
+addColumn("ALTER TABLE tasks ADD COLUMN oven_temp INTEGER");
+
+// App-wide settings (e.g. "My kitchen"), one JSON value per key.
+db.exec("CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL)");
 
 db.exec(`
   CREATE INDEX IF NOT EXISTS idx_tasks_plan ON tasks(plan_id);

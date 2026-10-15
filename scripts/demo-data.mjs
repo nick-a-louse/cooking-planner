@@ -19,11 +19,11 @@ async function makePlan(name, anchorTime, mode, groups, asTemplate = false) {
   doc.tasks = [];
   doc.deps = [];
   groups.forEach(([, , tasks], gi) => {
-    for (const [key, tname, start, dur, kind = "task", after, notes = ""] of tasks) {
+    for (const [key, tname, start, dur, kind = "task", after, notes = "", equipment = null, ovenTemp = null] of tasks) {
       const tid = crypto.randomUUID();
       ids[key] = tid;
       doc.tasks.push({ id: tid, planId: id, groupId: doc.groups[gi].id, kind, name: tname, startMin: start, durationMin: dur,
-        color: null, notes, sortOrder: order++, status: "pending", actualStartAt: null, actualDoneAt: null });
+        color: null, notes, sortOrder: order++, status: "pending", actualStartAt: null, actualDoneAt: null, equipment, ovenTemp });
       if (after) doc.deps.push({ planId: id, predecessorId: ids[after], successorId: tid });
     }
   });
@@ -35,18 +35,18 @@ async function makePlan(name, anchorTime, mode, groups, asTemplate = false) {
 const christmas = [
   ["Turkey", "#A03A3A", [
     ["t1", "Take turkey out of fridge", 0, 60],
-    ["t2", "Roast turkey", 60, 210, "task", "t1", "Baste every 30 min"],
+    ["t2", "Roast turkey", 60, 210, "task", "t1", "Baste every 30 min", "oven-1", 180],
     ["t3", "Rest the turkey", 270, 40, "wait", "t2"],
     ["t4", "Carve", 310, 20, "task", "t3"]]],
   ["Potatoes", "#94742C", [
-    ["p1", "Peel and parboil potatoes", 150, 30],
-    ["p2", "Roast potatoes", 180, 70, "task", "p1", "Turn halfway"]]],
+    ["p1", "Peel and parboil potatoes", 150, 30, "task", undefined, "", "hob"],
+    ["p2", "Roast potatoes", 180, 70, "task", "p1", "Turn halfway", "oven-1", 200]]],
   ["Vegetables", "#3A6B4A", [
     ["v1", "Prep sprouts and carrots", 200, 30],
-    ["v2", "Steam vegetables", 290, 25, "task", "v1"]]],
+    ["v2", "Steam vegetables", 290, 25, "task", "v1", "", "hob"]]],
   ["Gravy and sauces", "#56497E", [
-    ["g1", "Make gravy from juices", 280, 30, "task", "t2"],
-    ["g2", "Warm bread sauce", 300, 15]]],
+    ["g1", "Make gravy from juices", 280, 30, "task", "t2", "", "hob"],
+    ["g2", "Warm bread sauce", 300, 15, "task", undefined, "", "hob"]]],
 ];
 await makePlan("Christmas dinner", `${year}-12-25T14:00`, "backward", christmas);
 await makePlan("Sunday roast", `${year}-11-02T13:00`, "forward", christmas.slice(0, 2));

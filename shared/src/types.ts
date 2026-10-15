@@ -15,6 +15,9 @@ export interface Plan {
   revision: number;
   /** Minutes of warning before a task starts during a live run (1, 2, 5 or 10). */
   alertLeadMin: number;
+  /** This plan's kitchen, for clash warnings. Copied from "My kitchen" when the plan is created. */
+  ovens: number;
+  hobRings: number;
   createdAt: string;
   updatedAt: string;
 }
@@ -47,6 +50,10 @@ export interface Task {
   status: TaskStatus;
   actualStartAt: string | null;
   actualDoneAt: string | null;
+  /** Equipment used: "hob", "oven-1", "oven-2", … or null. */
+  equipment: string | null;
+  /** Oven temperature in °C, when the task uses an oven. */
+  ovenTemp: number | null;
 }
 
 /** Finish-to-start dependency: successor starts after predecessor ends. */

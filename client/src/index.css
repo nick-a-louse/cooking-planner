@@ -1021,3 +1021,47 @@ button.rail-cell:hover .drag-grip {
   align-items: center;
   justify-content: center;
 }
+
+/* Kitchen clashes: warnings, never blocking */
+.task-bar-clash {
+  outline: 3px solid var(--bad);
+  outline-offset: 1px;
+}
+.clash-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--warn);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 8px;
+  font-size: 15px;
+}
+.clash-panel summary {
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--warn);
+}
+.clash-panel summary .muted {
+  font-weight: 400;
+}
+.clash-panel ul {
+  margin: 6px 0 2px;
+  padding-left: 20px;
+}
+.clash-panel li + li {
+  margin-top: 3px;
+}
+.link-button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  padding: 0;
+  text-decoration: underline;
+  text-decoration-color: var(--line-strong);
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.link-button:hover {
+  text-decoration-color: currentColor;
+}
