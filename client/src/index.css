@@ -1243,3 +1243,11 @@ a.btn {
   background: color-mix(in srgb, var(--accent) 16%, var(--surface));
   box-shadow: inset 0 -2px 0 var(--accent);
 }
+
+/* Task names are the handle for moving rows: say so with the cursor */
+.task-cell-draggable {
+  cursor: grab;
+}
+.task-cell-draggable:active {
+  cursor: grabbing;
+}

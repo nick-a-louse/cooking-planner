@@ -133,10 +133,10 @@ export default function App() {
 
   if (!doc) return <PlanList />;
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, ms = 2600) => {
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 2600);
+    toastTimer.current = setTimeout(() => setToast(null), ms);
   };
 
   const editingTask = doc.tasks.find((t) => t.id === editingTaskId) ?? null;
@@ -505,6 +505,7 @@ export default function App() {
         onReorder={reorderTasks}
         onMoveToGroup={moveTaskToGroup}
         onLockedDragAttempt={handleLockedDragAttempt}
+        onVerticalBarDrag={() => showToast("Bars only move in time. To move a task up, down or to another group, drag its name on the left (⠿).", 5000)}
         barClass={(t) =>
           [
             clashIds.has(t.id) ? "task-bar-clash" : "",

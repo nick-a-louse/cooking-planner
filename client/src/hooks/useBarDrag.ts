@@ -22,6 +22,8 @@ interface Gesture {
   moved: boolean;
   timer: ReturnType<typeof setTimeout> | null;
   scrollEl: HTMLElement | null;
+  maxDx?: number;
+  maxDy?: number;
 }
 
 const LONG_PRESS_MS = 250;
@@ -37,13 +39,18 @@ function snapTo(v: number, step: number): number {
  * Mouse drags immediately; touch requires a ~250ms hold to arm, and
  * unarmed touch movement is passed through as manual timeline scrolling.
  */
+/** How far a bar must be dragged up or down before the "drag the name instead" hint shows. */
+const VERTICAL_HINT_PX = 24;
+
 export function useBarDrag(opts: {
   startMin: number;
   durationMin: number;
   pxPerMin: number;
   onCommit: (startMin: number, durationMin: number) => void;
+  /** The bar was dragged mostly up or down: bars only move in time, so the app can point to the row grip. */
+  onVerticalDrag?: () => void;
 }) {
-  const { startMin, durationMin, pxPerMin, onCommit } = opts;
+  const { startMin, durationMin, pxPerMin, onCommit, onVerticalDrag } = opts;
   const [live, setLiveState] = useState<LiveDrag | null>(null);
   const liveRef = useRef<LiveDrag | null>(null);
   const gestureRef = useRef<Gesture | null>(null);
@@ -114,6 +121,8 @@ export function useBarDrag(opts: {
     }
 
     if (Math.abs(dx) > 3) g.moved = true;
+    g.maxDx = Math.max(g.maxDx ?? 0, Math.abs(dx));
+    g.maxDy = Math.max(g.maxDy ?? 0, Math.abs(dy));
     const dMin = dx / pxPerMin;
     if (g.kind === "move") {
       const s = Math.max(0, snapTo(g.startMin0 + dMin, DRAG_SNAP_MIN));
@@ -133,9 +142,16 @@ export function useBarDrag(opts: {
     if (!g) return;
     if (g.timer) clearTimeout(g.timer);
     gestureRef.current = null;
-    if (g.armed && g.moved) {
+    // Mostly up/down (more than half a row, and more than sideways): they meant to move the row.
+    if (commit && g.armed && g.kind === "move" && (g.maxDy ?? 0) > VERTICAL_HINT_PX && (g.maxDy ?? 0) > (g.maxDx ?? 0)) {
+      onVerticalDrag?.();
+    }
+    // Any real movement is a drag, not a click (else letting go opens the task editor).
+    if (g.armed && (g.moved || (g.maxDy ?? 0) > 3)) {
       suppressClickRef.current = true;
       setTimeout(() => (suppressClickRef.current = false), 0);
+    }
+    if (g.armed && g.moved) {
       const l = liveRef.current;
       if (commit && l) onCommit(l.startMin, l.durationMin);
     }

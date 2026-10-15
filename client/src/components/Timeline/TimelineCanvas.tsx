@@ -42,6 +42,8 @@ interface Props {
   /** A task dropped on another group (its header or one of its tasks): it goes to the bottom of that group. */
   onMoveToGroup: (taskId: string, groupId: string | null) => void;
   onLockedDragAttempt: (task: Task) => void;
+  /** A bar was dragged up or down (bars only move in time). */
+  onVerticalBarDrag: () => void;
   /** Extra classes for a task's bar, e.g. a clash outline. */
   barClass?: (task: Task) => string;
 }
@@ -76,7 +78,8 @@ function SortableTaskRow({
       style={{ transform: CSS.Transform.toString(transform), transition }}
     >
       <button
-        className="rail-cell task-cell"
+        className={`rail-cell task-cell${disabled ? "" : " task-cell-draggable"}`}
+        title={disabled ? undefined : "Click to edit. Drag to move up, down or to another group."}
         onClick={onEdit}
         onContextMenu={(e) => e.preventDefault()}
         {...attributes}
@@ -158,6 +161,7 @@ export default function TimelineCanvas({
   onReorder,
   onMoveToGroup,
   onLockedDragAttempt,
+  onVerticalBarDrag,
   barClass,
 }: Props) {
   const { plan, groups, tasks } = doc;
@@ -322,6 +326,7 @@ export default function TimelineCanvas({
                         onClick={() => onTaskClick(task)}
                         onCommit={(s, d) => onTaskTimeChange(task.id, s, d)}
                         onLockedDragAttempt={() => onLockedDragAttempt(task)}
+                        onVerticalDrag={onVerticalBarDrag}
                       />
                     </div>
                   </SortableTaskRow>

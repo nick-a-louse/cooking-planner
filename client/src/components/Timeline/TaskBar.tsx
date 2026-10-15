@@ -19,6 +19,8 @@ interface Props {
   onClick: () => void;
   onCommit: (startMin: number, durationMin: number) => void;
   onLockedDragAttempt: () => void;
+  /** Dragged up or down: bars only move in time; rows move by their name on the left. */
+  onVerticalDrag: () => void;
 }
 
 export default function TaskBar({
@@ -36,6 +38,7 @@ export default function TaskBar({
   onClick,
   onCommit,
   onLockedDragAttempt,
+  onVerticalDrag,
 }: Props) {
   const effMode = forceForward ? "forward" : mode;
   const drag = useBarDrag({
@@ -43,8 +46,11 @@ export default function TaskBar({
     durationMin: task.durationMin,
     pxPerMin,
     onCommit,
+    onVerticalDrag,
   });
   const lockedGesture = useRef<{ x: number; y: number; warned: boolean } | null>(null);
+  /** A drag attempt on a linked bar just ended: the click that follows isn't a real click. */
+  const lockedDragged = useRef(false);
 
   const startMin = drag.live?.startMin ?? task.startMin;
   const durationMin = drag.live?.durationMin ?? task.durationMin;
@@ -58,15 +64,27 @@ export default function TaskBar({
   const lockedHandlers = {
     onPointerDown: (e: React.PointerEvent) => {
       lockedGesture.current = { x: e.clientX, y: e.clientY, warned: false };
+      // Keep getting moves once the pointer leaves the (thin) bar, e.g. when dragging up or down.
+      try {
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+      } catch {
+        // Pointer already gone (a fast tap): nothing to track.
+      }
     },
     onPointerMove: (e: React.PointerEvent) => {
       const g = lockedGesture.current;
       if (g && !g.warned && Math.hypot(e.clientX - g.x, e.clientY - g.y) > 12) {
         g.warned = true;
-        onLockedDragAttempt();
+        // Up/down means "move the row", which works even for a linked task.
+        if (Math.abs(e.clientY - g.y) > Math.abs(e.clientX - g.x)) onVerticalDrag();
+        else onLockedDragAttempt();
       }
     },
     onPointerUp: () => {
+      if (lockedGesture.current?.warned) {
+        lockedDragged.current = true;
+        setTimeout(() => (lockedDragged.current = false), 0);
+      }
       lockedGesture.current = null;
     },
   };
@@ -91,7 +109,7 @@ export default function TaskBar({
       title={task.name}
       {...moveHandlers}
       onClick={() => {
-        if (!drag.shouldSuppressClick()) onClick();
+        if (!drag.shouldSuppressClick() && !lockedDragged.current) onClick();
       }}
       onKeyDown={(e) => {
         if (e.key === "Enter" || e.key === " ") onClick();
