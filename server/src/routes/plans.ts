@@ -2,9 +2,59 @@ import type { FastifyInstance } from "fastify";
 import { nanoid } from "nanoid";
 import type { Dep, Group, Plan, PlanDoc, PlanSummary, Task } from "@cookplan/shared";
 import { db, transaction } from "../db.js";
+import { clonePlanSchema, createPlanSchema, idParams, planDocSchema } from "../schemas.js";
 
 function now(): string {
   return new Date().toISOString();
+}
+
+/**
+ * Default anchor for a new plan: 18:00 on today's *local* date (the container's TZ).
+ * Using the UTC date picked yesterday between midnight and 01:00 during British Summer Time.
+ */
+export function defaultAnchor(at: Date = new Date()): string {
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${at.getFullYear()}-${pad(at.getMonth() + 1)}-${pad(at.getDate())}T18:00`;
+}
+
+/**
+ * Checks a plan document is self-consistent and only touches this plan's rows.
+ * Returns an error message, or null when the document is fine.
+ */
+function docProblem(planId: string, d: PlanDoc): string | null {
+  const groupIds = new Set<string>();
+  for (const g of d.groups) {
+    if (groupIds.has(g.id)) return `Group id "${g.id}" is used twice`;
+    groupIds.add(g.id);
+  }
+  const taskIds = new Set<string>();
+  for (const t of d.tasks) {
+    if (taskIds.has(t.id)) return `Task id "${t.id}" is used twice`;
+    taskIds.add(t.id);
+    if (t.groupId !== null && !groupIds.has(t.groupId)) return `Task "${t.name}" is in a group that isn't in this plan`;
+  }
+  const depKeys = new Set<string>();
+  for (const dep of d.deps) {
+    if (!taskIds.has(dep.predecessorId) || !taskIds.has(dep.successorId)) {
+      return "A dependency links a task that isn't in this plan";
+    }
+    if (dep.predecessorId === dep.successorId) return "A task can't depend on itself";
+    const key = `${dep.predecessorId}>${dep.successorId}`;
+    if (depKeys.has(key)) return "The same dependency is listed twice";
+    depKeys.add(key);
+  }
+  // Ids are global primary keys: refuse ids that already belong to another plan.
+  const clash = (table: "tasks" | "groups", ids: Set<string>) => {
+    if (ids.size === 0) return false;
+    const list = [...ids];
+    const row = db
+      .prepare(`SELECT id FROM ${table} WHERE plan_id != ? AND id IN (${list.map(() => "?").join(",")}) LIMIT 1`)
+      .get(planId, ...list);
+    return row !== undefined;
+  };
+  if (clash("groups", groupIds)) return "A group id belongs to another plan";
+  if (clash("tasks", taskIds)) return "A task id belongs to another plan";
+  return null;
 }
 
 /** Plan names are unique (case-insensitive, trimmed) across plans and templates. */
@@ -100,72 +150,80 @@ export function planRoutes(app: FastifyInstance): void {
     return summaries;
   });
 
-  app.post<{ Body: { name?: string; mode?: string; anchorTime?: string } }>("/api/plans", (req, reply) => {
-    const { name, mode, anchorTime } = req.body ?? {};
-    const finalName = name?.trim() || "Untitled plan";
-    if (nameTaken(finalName)) {
-      return reply.code(409).send({ error: `A plan called "${finalName}" already exists` });
-    }
-    const id = nanoid(10);
-    const ts = now();
-    // Default anchor: today at 18:00 local — a sensible dinner-time starting point.
-    const defaultAnchor = `${ts.slice(0, 10)}T18:00`;
-    db.prepare(
-      `INSERT INTO plans (id, name, mode, anchor_time, is_template, status, created_at, updated_at)
-       VALUES (?, ?, ?, ?, 0, 'draft', ?, ?)`,
-    ).run(id, finalName, mode === "backward" ? "backward" : "forward", anchorTime ?? defaultAnchor, ts, ts);
-    reply.code(201);
-    return loadDoc(id);
-  });
+  app.post<{ Body: { name?: string; mode?: string; anchorTime?: string } }>(
+    "/api/plans",
+    { schema: { body: createPlanSchema } },
+    (req, reply) => {
+      const { name, mode, anchorTime } = req.body ?? {};
+      const finalName = name?.trim() || "Untitled plan";
+      if (nameTaken(finalName)) {
+        return reply.code(409).send({ error: `A plan called "${finalName}" already exists` });
+      }
+      const id = nanoid(10);
+      const ts = now();
+      db.prepare(
+        `INSERT INTO plans (id, name, mode, anchor_time, is_template, status, created_at, updated_at)
+         VALUES (?, ?, ?, ?, 0, 'draft', ?, ?)`,
+      ).run(id, finalName, mode === "backward" ? "backward" : "forward", anchorTime ?? defaultAnchor(), ts, ts);
+      reply.code(201);
+      return loadDoc(id);
+    },
+  );
 
-  app.get<{ Params: { id: string } }>("/api/plans/:id", (req, reply) => {
+  app.get<{ Params: { id: string } }>("/api/plans/:id", { schema: { params: idParams } }, (req, reply) => {
     const doc = loadDoc(req.params.id);
     if (!doc) return reply.code(404).send({ error: "plan not found" });
     return doc;
   });
 
   // Transactional full-document replace: plan fields + all groups/tasks/deps.
-  app.put<{ Params: { id: string }; Body: PlanDoc }>("/api/plans/:id", (req, reply) => {
-    const planId = req.params.id;
-    const existing = db.prepare("SELECT id FROM plans WHERE id = ?").get(planId);
-    if (!existing) return reply.code(404).send({ error: "plan not found" });
-    const doc = req.body;
-    if (!doc?.plan || doc.plan.id !== planId) {
-      return reply.code(400).send({ error: "document plan id mismatch" });
-    }
-    if (nameTaken(doc.plan.name, planId)) {
-      return reply.code(409).send({ error: `A plan called "${doc.plan.name}" already exists` });
-    }
+  app.put<{ Params: { id: string }; Body: PlanDoc }>(
+    "/api/plans/:id",
+    { schema: { params: idParams, body: planDocSchema } },
+    (req, reply) => {
+      const planId = req.params.id;
+      const existing = db.prepare("SELECT id FROM plans WHERE id = ?").get(planId);
+      if (!existing) return reply.code(404).send({ error: "plan not found" });
+      const doc = req.body;
+      if (!doc?.plan || doc.plan.id !== planId) {
+        return reply.code(400).send({ error: "document plan id mismatch" });
+      }
+      if (nameTaken(doc.plan.name, planId)) {
+        return reply.code(409).send({ error: `A plan called "${doc.plan.name}" already exists` });
+      }
+      const problem = docProblem(planId, doc);
+      if (problem) return reply.code(400).send({ error: problem });
 
-    transaction(() => {
-      const d = doc;
-      db.prepare(
-        `UPDATE plans SET name=@name, mode=@mode, anchor_time=@anchorTime, is_template=@isTemplate,
-         status=@status, live_started_at=@liveStartedAt, updated_at=@updatedAt WHERE id=@id`,
-      ).run({
-        id: planId,
-        name: d.plan.name,
-        mode: d.plan.mode,
-        anchorTime: d.plan.anchorTime,
-        isTemplate: d.plan.isTemplate ? 1 : 0,
-        status: d.plan.status,
-        liveStartedAt: d.plan.liveStartedAt,
-        updatedAt: now(),
+      transaction(() => {
+        const d = doc;
+        db.prepare(
+          `UPDATE plans SET name=@name, mode=@mode, anchor_time=@anchorTime, is_template=@isTemplate,
+           status=@status, live_started_at=@liveStartedAt, updated_at=@updatedAt WHERE id=@id`,
+        ).run({
+          id: planId,
+          name: d.plan.name,
+          mode: d.plan.mode,
+          anchorTime: d.plan.anchorTime,
+          isTemplate: d.plan.isTemplate ? 1 : 0,
+          status: d.plan.status,
+          liveStartedAt: d.plan.liveStartedAt,
+          updatedAt: now(),
+        });
+        db.prepare("DELETE FROM deps WHERE plan_id = ?").run(planId);
+        db.prepare("DELETE FROM tasks WHERE plan_id = ?").run(planId);
+        db.prepare("DELETE FROM groups WHERE plan_id = ?").run(planId);
+        const gStmt = insertGroup();
+        const tStmt = insertTask();
+        const dStmt = insertDep();
+        for (const g of d.groups) gStmt.run({ ...g, planId });
+        for (const t of d.tasks) tStmt.run({ ...t, planId });
+        for (const dep of d.deps) dStmt.run({ ...dep, planId });
       });
-      db.prepare("DELETE FROM deps WHERE plan_id = ?").run(planId);
-      db.prepare("DELETE FROM tasks WHERE plan_id = ?").run(planId);
-      db.prepare("DELETE FROM groups WHERE plan_id = ?").run(planId);
-      const gStmt = insertGroup();
-      const tStmt = insertTask();
-      const dStmt = insertDep();
-      for (const g of d.groups) gStmt.run({ ...g, planId });
-      for (const t of d.tasks) tStmt.run({ ...t, planId });
-      for (const dep of d.deps) dStmt.run({ ...dep, planId });
-    });
-    return loadDoc(planId);
-  });
+      return loadDoc(planId);
+    },
+  );
 
-  app.delete<{ Params: { id: string } }>("/api/plans/:id", (req, reply) => {
+  app.delete<{ Params: { id: string } }>("/api/plans/:id", { schema: { params: idParams } }, (req, reply) => {
     const info = db.prepare("DELETE FROM plans WHERE id = ?").run(req.params.id);
     if (info.changes === 0) return reply.code(404).send({ error: "plan not found" });
     reply.code(204).send();
@@ -174,6 +232,7 @@ export function planRoutes(app: FastifyInstance): void {
   // Clone a plan (optionally as/from a template). New ids throughout, live state reset.
   app.post<{ Params: { id: string }; Body: { name?: string; asTemplate?: boolean; anchorTime?: string } }>(
     "/api/plans/:id/clone",
+    { schema: { params: idParams, body: clonePlanSchema } },
     (req, reply) => {
       const src = loadDoc(req.params.id);
       if (!src) return reply.code(404).send({ error: "plan not found" });

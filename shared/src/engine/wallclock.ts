@@ -1,13 +1,13 @@
 import type { PlanMode, Task } from "../types.js";
 
-/** Snap a minute value to whole minutes, clamped at 0. */
+/** Snap a minute value to whole minutes, clamped at 0 (an empty or invalid input gives 0). */
 export function snapMin(value: number): number {
-  return Math.max(0, Math.round(value));
+  return Number.isFinite(value) ? Math.max(0, Math.round(value)) : 0;
 }
 
-/** Snap a duration to whole minutes with a 1-minute floor. */
+/** Snap a duration to whole minutes with a 1-minute floor (an empty or invalid input gives 1). */
 export function snapDuration(value: number): number {
-  return Math.max(1, Math.round(value));
+  return Number.isFinite(value) ? Math.max(1, Math.round(value)) : 1;
 }
 
 /** End of the plan on the internal timeline (latest task end), 0 for an empty plan. */

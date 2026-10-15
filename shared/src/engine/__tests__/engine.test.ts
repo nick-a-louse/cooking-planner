@@ -142,6 +142,12 @@ describe("wallclock", () => {
     expect(snapDuration(0.2)).toBe(1);
   });
 
+  it("treats an empty or invalid input as the minimum, never NaN", () => {
+    expect(snapMin(NaN)).toBe(0);
+    expect(snapDuration(NaN)).toBe(1);
+    expect(snapDuration(Infinity)).toBe(1);
+  });
+
   it("forward mode maps offset from anchor", () => {
     const d = wallClock(90, "forward", "2026-12-25T13:00", 200);
     expect(d.getHours()).toBe(14);

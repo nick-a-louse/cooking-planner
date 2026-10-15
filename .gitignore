@@ -11,3 +11,6 @@ data/
 # local tool settings
 .claude/
 .vscode/
+
+# TypeScript build cache
+*.tsbuildinfo

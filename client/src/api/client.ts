@@ -1,10 +1,10 @@
 import type { PlanDoc, PlanSummary } from "@cookplan/shared";
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
-  const res = await fetch(url, {
-    headers: { "Content-Type": "application/json" },
-    ...init,
-  });
+  // Only label the request as JSON when it actually carries a body: Fastify rejects
+  // a request that says "application/json" but sends nothing (e.g. DELETE) with a 400.
+  const headers = init?.body !== undefined ? { "Content-Type": "application/json" } : undefined;
+  const res = await fetch(url, { ...init, headers: { ...headers, ...init?.headers } });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error((body as any).error ?? `${res.status} ${res.statusText}`);
