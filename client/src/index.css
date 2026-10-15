@@ -1174,3 +1174,25 @@ button.rail-cell:hover .drag-grip {
     white-space: pre-wrap;
   }
 }
+
+/* Export link on a plan card, and the Share and back up section */
+.plan-export:hover {
+  color: var(--ink);
+  border-color: var(--ink);
+}
+/* gomez-ui already gives a top-level section its divider and spacing */
+.share-backup {
+  margin-top: 16px;
+}
+.share-backup .section-title {
+  margin-bottom: 6px;
+}
+.share-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+a.btn {
+  text-decoration: none;
+}

@@ -1,9 +1,9 @@
-import type { FastifyInstance } from "fastify";
+import type { FastifyInstance, FastifyReply } from "fastify";
 import { nanoid } from "nanoid";
 import type { Dep, Group, Plan, PlanDoc, PlanSummary, Task } from "@cookplan/shared";
 import { db, transaction } from "../db.js";
 import { publish, openStream } from "../events.js";
-import { clonePlanSchema, createPlanSchema, idParams, kitchenSchema, planDocSchema } from "../schemas.js";
+import { clonePlanSchema, createPlanSchema, idParams, importSchema, kitchenSchema, planDocSchema } from "../schemas.js";
 import { DEFAULT_KITCHEN, type Kitchen } from "@cookplan/shared";
 
 function now(): string {
@@ -24,6 +24,26 @@ export function defaultAnchor(at: Date = new Date()): string {
  * Returns an error message, or null when the document is fine.
  */
 function docProblem(planId: string, d: PlanDoc): string | null {
+  const inconsistency = docInconsistency(d);
+  if (inconsistency) return inconsistency;
+  const groupIds = new Set(d.groups.map((g) => g.id));
+  const taskIds = new Set(d.tasks.map((t) => t.id));
+  // Ids are global primary keys: refuse ids that already belong to another plan.
+  const clash = (table: "tasks" | "groups", ids: Set<string>) => {
+    if (ids.size === 0) return false;
+    const list = [...ids];
+    const row = db
+      .prepare(`SELECT id FROM ${table} WHERE plan_id != ? AND id IN (${list.map(() => "?").join(",")}) LIMIT 1`)
+      .get(planId, ...list);
+    return row !== undefined;
+  };
+  if (clash("groups", groupIds)) return "A group id belongs to another plan";
+  if (clash("tasks", taskIds)) return "A task id belongs to another plan";
+  return null;
+}
+
+/** A plan document's own consistency: unique ids, and links only to its own groups and tasks. */
+function docInconsistency(d: PlanDoc): string | null {
   const groupIds = new Set<string>();
   for (const g of d.groups) {
     if (groupIds.has(g.id)) return `Group id "${g.id}" is used twice`;
@@ -45,17 +65,6 @@ function docProblem(planId: string, d: PlanDoc): string | null {
     if (depKeys.has(key)) return "The same dependency is listed twice";
     depKeys.add(key);
   }
-  // Ids are global primary keys: refuse ids that already belong to another plan.
-  const clash = (table: "tasks" | "groups", ids: Set<string>) => {
-    if (ids.size === 0) return false;
-    const list = [...ids];
-    const row = db
-      .prepare(`SELECT id FROM ${table} WHERE plan_id != ? AND id IN (${list.map(() => "?").join(",")}) LIMIT 1`)
-      .get(planId, ...list);
-    return row !== undefined;
-  };
-  if (clash("groups", groupIds)) return "A group id belongs to another plan";
-  if (clash("tasks", taskIds)) return "A task id belongs to another plan";
   return null;
 }
 
@@ -129,18 +138,87 @@ function loadDoc(planId: string): PlanDoc | null {
   return { plan: rowToPlan(planRow), groups, tasks, deps };
 }
 
-/** Per-plan settings that a copy or a plan made from a template keeps. */
-const SETTINGS_COLUMNS = ["alert_lead_min", "ovens", "hob_rings", "cooks"];
-
 /** "My kitchen": the default equipment for new plans. */
 export function getKitchen(): Kitchen {
   const row = db.prepare("SELECT value FROM settings WHERE key = 'kitchen'").get() as { value: string } | undefined;
   return row ? { ...DEFAULT_KITCHEN, ...JSON.parse(row.value) } : DEFAULT_KITCHEN;
 }
 
-function copyPlanSettings(fromId: string, toId: string): void {
-  const set = SETTINGS_COLUMNS.map((c) => `${c} = (SELECT ${c} FROM plans WHERE id = @fromId)`).join(", ");
-  db.prepare(`UPDATE plans SET ${set} WHERE id = @toId`).run({ fromId, toId });
+/** The file format for export and import. */
+export const EXPORT_FORMAT = "cooking-planner";
+export interface ExportFile {
+  format: typeof EXPORT_FORMAT;
+  version: 1;
+  exportedAt?: string;
+  plans: PlanDoc[];
+}
+
+function sendExport(reply: FastifyReply, plans: PlanDoc[], baseName: string) {
+  const file: ExportFile = { format: EXPORT_FORMAT, version: 1, exportedAt: now(), plans };
+  const slug = baseName.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "plan";
+  return reply
+    .header("Content-Disposition", `attachment; filename="${slug}.cookplan.json"`)
+    .type("application/json")
+    .send(JSON.stringify(file, null, 2));
+}
+
+/** A name not used by any plan yet: the name itself, else "<name> (imported)", "(imported 2)", … */
+function freeName(name: string): string {
+  if (!nameTaken(name)) return name;
+  for (let n = 1; ; n++) {
+    const candidate = `${name} (imported${n === 1 ? "" : ` ${n}`})`;
+    if (!nameTaken(candidate)) return candidate;
+  }
+}
+
+/**
+ * Insert a copy of a plan document under new ids, as a fresh draft (no live run, nothing ticked off).
+ * Used by clone, "use template" and import. Call inside a transaction; returns the new plan's id.
+ */
+function insertCopy(src: PlanDoc, opts: { name: string; isTemplate: boolean; anchorTime: string }): string {
+  const ts = now();
+  const planId = nanoid(10);
+  const groupIds = new Map(src.groups.map((g) => [g.id, nanoid(10)]));
+  const taskIds = new Map(src.tasks.map((t) => [t.id, nanoid(10)]));
+  const kitchen = getKitchen();
+  db.prepare(
+    `INSERT INTO plans (id, name, mode, anchor_time, is_template, status, created_at, updated_at, alert_lead_min, ovens, hob_rings, cooks)
+     VALUES (@id, @name, @mode, @anchorTime, @isTemplate, 'draft', @ts, @ts, @alertLeadMin, @ovens, @hobRings, @cooks)`,
+  ).run({
+    id: planId,
+    name: opts.name,
+    mode: src.plan.mode,
+    anchorTime: opts.anchorTime,
+    isTemplate: opts.isTemplate ? 1 : 0,
+    ts,
+    // Settings a copy keeps; a file from an older version may not have them.
+    alertLeadMin: src.plan.alertLeadMin ?? 5,
+    ovens: src.plan.ovens ?? kitchen.ovens,
+    hobRings: src.plan.hobRings ?? kitchen.hobRings,
+    cooks: src.plan.cooks ?? 1,
+  });
+  const gStmt = insertGroup();
+  const tStmt = insertTask();
+  const dStmt = insertDep();
+  for (const g of src.groups) gStmt.run({ ...g, id: groupIds.get(g.id)!, planId });
+  for (const t of src.tasks) {
+    tStmt.run({
+      ...t,
+      id: taskIds.get(t.id)!,
+      planId,
+      groupId: t.groupId ? (groupIds.get(t.groupId) ?? null) : null,
+      status: "pending",
+      actualStartAt: null,
+      actualDoneAt: null,
+      equipment: t.equipment ?? null,
+      ovenTemp: t.ovenTemp ?? null,
+      handsOff: t.handsOff ? 1 : 0,
+    });
+  }
+  for (const dep of src.deps) {
+    dStmt.run({ planId, predecessorId: taskIds.get(dep.predecessorId)!, successorId: taskIds.get(dep.successorId)! });
+  }
+  return planId;
 }
 
 const insertGroup = () =>
@@ -305,55 +383,56 @@ export function planRoutes(app: FastifyInstance): void {
       if (nameTaken(cloneName)) {
         return reply.code(409).send({ error: `A plan called "${cloneName}" already exists` });
       }
-      const ts = now();
-      const newPlanId = nanoid(10);
-      const groupIdMap = new Map<string, string>();
-      const taskIdMap = new Map<string, string>();
-      for (const g of src.groups) groupIdMap.set(g.id, nanoid(10));
-      for (const t of src.tasks) taskIdMap.set(t.id, nanoid(10));
-
-      transaction(() => {
-        db.prepare(
-          `INSERT INTO plans (id, name, mode, anchor_time, is_template, status, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, 'draft', ?, ?)`,
-        ).run(
-          newPlanId,
-          name?.trim() || `${src.plan.name} (copy)`,
-          src.plan.mode,
-          anchorTime ?? src.plan.anchorTime,
-          asTemplate ? 1 : 0,
-          ts,
-          ts,
-        );
-        copyPlanSettings(src.plan.id, newPlanId);
-        const gStmt = insertGroup();
-        const tStmt = insertTask();
-        const dStmt = insertDep();
-        for (const g of src.groups) {
-          gStmt.run({ ...g, id: groupIdMap.get(g.id)!, planId: newPlanId });
-        }
-        for (const t of src.tasks) {
-          tStmt.run({
-            ...t,
-            id: taskIdMap.get(t.id)!,
-            planId: newPlanId,
-            groupId: t.groupId ? (groupIdMap.get(t.groupId) ?? null) : null,
-            status: "pending",
-            actualStartAt: null,
-            actualDoneAt: null,
-            handsOff: t.handsOff ? 1 : 0,
-          });
-        }
-        for (const dep of src.deps) {
-          dStmt.run({
-            planId: newPlanId,
-            predecessorId: taskIdMap.get(dep.predecessorId)!,
-            successorId: taskIdMap.get(dep.successorId)!,
-          });
-        }
-      });
+      const newPlanId = transaction(() =>
+        insertCopy(src, { name: cloneName, isTemplate: !!asTemplate, anchorTime: anchorTime ?? src.plan.anchorTime }),
+      );
       reply.code(201);
       return loadDoc(newPlanId);
+    },
+  );
+
+  // Export one plan or template as a file (sharing templates, backups).
+  app.get<{ Params: { id: string } }>("/api/plans/:id/export", { schema: { params: idParams } }, (req, reply) => {
+    const doc = loadDoc(req.params.id);
+    if (!doc) return reply.code(404).send({ error: "plan not found" });
+    return sendExport(reply, [doc], doc.plan.name);
+  });
+
+  // Export every plan and template in one file.
+  app.get("/api/export", (_req, reply) => {
+    const ids = db.prepare("SELECT id FROM plans ORDER BY is_template, name").all() as { id: string }[];
+    return sendExport(reply, ids.map((r) => loadDoc(r.id)!), "cooking-planner-all");
+  });
+
+  // Import a file made by an export. Always adds new plans (fresh ids); never overwrites.
+  // A name already in use gets " (imported)" added, then " (imported 2)" and so on.
+  app.post<{ Body: ExportFile }>(
+    "/api/import",
+    { schema: { body: importSchema }, bodyLimit: 10 * 1024 * 1024, attachValidation: true },
+    (req, reply) => {
+      if (req.validationError) {
+        const body = req.body as Partial<ExportFile> | null;
+        const message =
+          body?.format !== EXPORT_FORMAT
+            ? "This file isn't a Cooking Planner export."
+            : body.version !== 1
+              ? "This file was made by a newer version of Cooking Planner. Update this app, then try again."
+              : `Part of this file isn't valid (${req.validationError.message.replace(/^body\//, "")}).`;
+        return reply.code(400).send({ error: message });
+      }
+      for (const d of req.body.plans) {
+        const problem = docInconsistency(d);
+        if (problem) return reply.code(400).send({ error: `"${d.plan.name}": ${problem}` });
+      }
+      const imported = transaction(() =>
+        req.body.plans.map((d) => {
+          const name = freeName(d.plan.name.trim());
+          const id = insertCopy(d, { name, isTemplate: d.plan.isTemplate, anchorTime: d.plan.anchorTime });
+          return { id, name, isTemplate: d.plan.isTemplate };
+        }),
+      );
+      reply.code(201);
+      return { imported };
     },
   );
 }

@@ -239,3 +239,82 @@ describe("hands-on", () => {
     expect(clone.tasks[0].handsOff).toBe(true);
   });
 });
+
+describe("export and import", () => {
+  const mkTask = (planId: string, id: string, extra: Record<string, unknown> = {}) => ({
+    id, planId, groupId: null, kind: "task", name: id, startMin: 0, durationMin: 10, color: null, notes: "n",
+    sortOrder: 0, status: "pending", actualStartAt: null, actualDoneAt: null, equipment: "oven-1", ovenTemp: 190, handsOff: true, ...extra,
+  });
+
+  async function sharedTemplate(name = "Roast template") {
+    const doc = (await app.inject({ method: "POST", url: "/api/plans", payload: { name } })).json();
+    doc.plan.isTemplate = true;
+    doc.plan.cooks = 2;
+    const k = doc.plan.id; // task ids are unique across all plans
+    doc.groups = [{ id: `${k}g`, planId: k, name: "Roast", color: "#a03a3a", sortOrder: 0 }];
+    doc.tasks = [mkTask(k, "ra", { id: `${k}a`, groupId: `${k}g` }), mkTask(k, "rb", { id: `${k}b`, status: "done" })];
+    doc.deps = [{ planId: k, predecessorId: `${k}a`, successorId: `${k}b` }];
+    return (await app.inject({ method: "PUT", url: `/api/plans/${doc.plan.id}`, payload: doc })).json();
+  }
+
+  it("exports one plan as a downloadable file and imports it as a new copy, never overwriting", async () => {
+    const original = await sharedTemplate();
+    const res = await app.inject(`/api/plans/${original.plan.id}/export`);
+    expect(res.headers["content-disposition"]).toContain('filename="roast-template.cookplan.json"');
+    const file = res.json();
+    expect(file).toMatchObject({ format: "cooking-planner", version: 1 });
+    expect(file.plans).toHaveLength(1);
+
+    const imp = await app.inject({ method: "POST", url: "/api/import", payload: file });
+    expect(imp.statusCode).toBe(201);
+    const [{ id, name, isTemplate }] = imp.json().imported;
+    expect(name).toBe("Roast template (imported)");
+    expect(isTemplate).toBe(true);
+    expect(id).not.toBe(original.plan.id);
+
+    const copy = (await app.inject(`/api/plans/${id}`)).json();
+    expect(copy.plan.cooks).toBe(2);
+    expect(copy.tasks).toHaveLength(2);
+    expect(copy.tasks[0]).toMatchObject({ name: "ra", equipment: "oven-1", ovenTemp: 190, handsOff: true, notes: "n" });
+    expect(copy.tasks.every((t: any) => t.status === "pending")).toBe(true); // a fresh start
+    expect(copy.deps).toHaveLength(1);
+    expect(copy.groups[0].name).toBe("Roast");
+    expect(copy.tasks[0].groupId).toBe(copy.groups[0].id);
+    // the original is untouched
+    expect((await app.inject(`/api/plans/${original.plan.id}`)).json().tasks).toHaveLength(2);
+
+    const again = (await app.inject({ method: "POST", url: "/api/import", payload: file })).json();
+    expect(again.imported[0].name).toBe("Roast template (imported 2)");
+  });
+
+  it("exports everything and imports it all back as additions", async () => {
+    const before = (await app.inject("/api/plans")).json().length;
+    const all = (await app.inject("/api/export")).json();
+    expect(all.plans).toHaveLength(before);
+    const imp = await app.inject({ method: "POST", url: "/api/import", payload: all });
+    expect(imp.json().imported).toHaveLength(before);
+    expect((await app.inject("/api/plans")).json()).toHaveLength(before * 2);
+  });
+
+  it.each([
+    ["not an export file", { hello: "world" }, /isn't a Cooking Planner export/],
+    ["the wrong version", { format: "cooking-planner", version: 2, plans: [] }, /newer version/],
+    ["no plans", { format: "cooking-planner", version: 1, plans: [] }, /isn't valid \(plans/],
+  ])("rejects %s with a clear message", async (_l, body, msg) => {
+    const r = await app.inject({ method: "POST", url: "/api/import", payload: body });
+    expect(r.statusCode).toBe(400);
+    expect(r.json().error).toMatch(msg);
+  });
+
+  it("rejects a plan whose links don't add up, importing nothing", async () => {
+    const original = await sharedTemplate("To break");
+    const file = (await app.inject(`/api/plans/${original.plan.id}/export`)).json();
+    file.plans[0].plan.name = "Broken";
+    file.plans[0].deps.push({ predecessorId: file.plans[0].tasks[0].id, successorId: "nope" });
+    const before = (await app.inject("/api/plans")).json().length;
+    const r = await app.inject({ method: "POST", url: "/api/import", payload: file });
+    expect(r.statusCode).toBe(400);
+    expect(r.json().error).toMatch(/Broken/);
+    expect((await app.inject("/api/plans")).json()).toHaveLength(before);
+  });
+});

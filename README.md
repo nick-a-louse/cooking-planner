@@ -98,6 +98,7 @@ Set by the image (no need to change): `PORT=8000`, `DB_PATH=/data/app.db`, `CLIE
 ## Monitoring
 
 - `GET /healthz` returns `{"ok": true, "version": …, "plans": …, "last_save": …}`, or 503 if the database can't be read. The Docker healthcheck uses it.
+- The API also offers `GET /api/plans/:id/export`, `GET /api/export` and `POST /api/import` (the same files as the buttons).
 - `GET /metrics` (Prometheus text, for VictoriaMetrics):
   - `cooking_planner_build_info{version}`
   - `cooking_planner_last_success_timestamp_seconds`: the most recent change to any plan
@@ -115,6 +116,7 @@ The header's "Updated" line shows the last successful save. It turns red only if
 - **Hands-on overlaps.** Tasks need someone's hands unless ticked *Hands-off* (e.g. roasting); waits never do. Set how many **cooks** a plan has, and it warns when more hands-on tasks overlap than that (amber dashed outline, listed with the kitchen clashes).
 - **Critical path.** The *Critical path* button outlines the chain of tasks that decides when the meal is ready (a delay to any of them makes it later) and dims the rest.
 - **Print** (button in the plan header): page 1 is the whole timeline on one page, then a timed checklist with tick boxes, in time order with equipment and notes. Black on white whatever the screen theme; use the print dialog's *Save as PDF* for a file.
+- **Export and import.** The arrow on a plan or template card downloads it as a `.cookplan.json` file to share with anyone else running Cooking Planner; **Export all** downloads everything as a backup. **Import a file** always adds new plans (a name already in use gets *(imported)* added) and never replaces yours. Imported plans start fresh: no live run, nothing ticked off.
 - **Undo and redo** (Ctrl+Z, Ctrl+Shift+Z) for up to 50 planning edits.
 
 ## On cooking day
